@@ -23,7 +23,7 @@ public class OptionsController : MonoBehaviour
         GameController.Instance.NextStep();
     }
     private void RemoveObject() {
-        GameController.Instance.NextStep();
+        GameController.Instance.NextStep(3);
     }
 
     private void CloneObject() {
@@ -31,7 +31,7 @@ public class OptionsController : MonoBehaviour
     }
 
     private void GetOfTheDatabase() {
-        GameController.Instance.NextStep(3, 1);
+        GameController.Instance.NextStep(4);
     }
 
     private void ReturnStep()

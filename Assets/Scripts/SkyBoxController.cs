@@ -1,9 +1,11 @@
+using System;
 using UnityEngine;
 
 public class SkyBoxController : MonoBehaviour
 {
     [SerializeField] private Material skyboxMaterial;
     [SerializeField] private Cubemap[] cubemaps;
+    [SerializeField] private Cubemap defaultCubmap;
     private static SkyBoxController _instance;
 
     // Singleton
@@ -30,4 +32,10 @@ public class SkyBoxController : MonoBehaviour
         skyboxMaterial.SetTexture("_Tex", cubemap);
         RenderSettings.skybox = skyboxMaterial;
     }
+    public void ResetExp()
+    {
+        skyboxMaterial.SetTexture("_Tex", default);
+        RenderSettings.skybox = skyboxMaterial;
+    }
+
 }

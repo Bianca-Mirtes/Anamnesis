@@ -3,6 +3,7 @@ using UnityEngine;
 public class GameController : MonoBehaviour
 {
     public int currentStep = 0;
+    public int lastStep;
 
     private static GameController _instance;
 
@@ -26,22 +27,32 @@ public class GameController : MonoBehaviour
 
     public void ReturnStep()
     {
-        currentStep--;
-        transform.GetChild(currentStep).gameObject.SetActive(true);
-        transform.GetChild(currentStep+1).gameObject.SetActive(false);
+        transform.GetChild(currentStep).gameObject.SetActive(false);
+        transform.GetChild(lastStep).gameObject.SetActive(true);
+        currentStep = lastStep;
+
+        if (currentStep == 0)
+        {
+            SkyBoxController.Instance.ResetExp();
+            lastStep = 0;   
+        }
+
     }
 
     public void NextStep()
     {
+        lastStep = currentStep;
         currentStep++;
         transform.GetChild(currentStep).gameObject.SetActive(true);
-        transform.GetChild(currentStep-1).gameObject.SetActive(false);
+        transform.GetChild(lastStep).gameObject.SetActive(false);
     }
 
-    public void NextStep(int step, int previousStep)
+    public void NextStep(int index)
     {
-        currentStep = step;
+        lastStep = currentStep;
+        currentStep = index;
+
         transform.GetChild(currentStep).gameObject.SetActive(true);
-        transform.GetChild(previousStep).gameObject.SetActive(false);
+        transform.GetChild(lastStep).gameObject.SetActive(false);
     }
 }

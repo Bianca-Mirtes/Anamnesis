@@ -1,16 +1,31 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.XR;
 
 public class RecordingController : MonoBehaviour
 {
-    public KeyCode recordKey = KeyCode.JoystickButton1; // substitua pelo botão VR
     private AudioClip recordedClip;
     private string micDevice;
     private bool isRecording = false;
+    private List<InputDevice> devices = new List<InputDevice>();
+    public bool lastPressed = false;
+
+    [SerializeField] private GameObject spinner;
+    [SerializeField] private TMP_Text description;
+    [SerializeField] private Button sendAudioBtn;
+    [SerializeField] private Button newAudioBtn;
+    [SerializeField] private Button returnBtn;
 
     void Start()
     {
+        returnBtn.onClick.AddListener(ReturnStep);
+        sendAudioBtn.onClick.AddListener(SendAudio);
+        newAudioBtn.onClick.AddListener(NewAudio);
+
         if (Microphone.devices.Length > 0)
             micDevice = Microphone.devices[0];
         else
@@ -22,11 +37,18 @@ public class RecordingController : MonoBehaviour
     {
         if (GameController.Instance.currentStep == 2)
         {
-            if (Input.GetKeyDown(recordKey) && !isRecording)
-                StartRecording();
+            InputDeviceCharacteristics leftHandCharacteristics = InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller;
+            InputDevices.GetDevicesWithCharacteristics(leftHandCharacteristics, devices);
+            devices[0].TryGetFeatureValue(CommonUsages.primaryButton, out bool isPressed);
 
-            if (Input.GetKeyUp(recordKey) && isRecording)
+            if(isPressed && !lastPressed && !isRecording)
+            {
+                StartRecording();
+            }
+            if(!isPressed && lastPressed && isRecording)
+            {
                 StopAndSave();
+            }
         }
     }
 
@@ -34,6 +56,8 @@ public class RecordingController : MonoBehaviour
     {
         isRecording = true;
         recordedClip = Microphone.Start(micDevice, false, 45, 44100);
+        description.gameObject.SetActive(false);
+        spinner.SetActive(isRecording);
         Debug.Log("Gravação iniciada...");
     }
 
@@ -41,7 +65,9 @@ public class RecordingController : MonoBehaviour
     {
         isRecording = false;
         Microphone.End(micDevice);
-        Debug.Log("Gravação finalizada. Salvando arquivo...");
+        description.text = "Recording ended. Saving audio file...";
+        description.gameObject.SetActive(true);
+        spinner.SetActive(isRecording);
 
         string filename = "Gravacao_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".wav";
         string filepath = Path.Combine(Application.persistentDataPath, filename);
@@ -49,6 +75,21 @@ public class RecordingController : MonoBehaviour
         SaveWav(filepath, recordedClip);
 
         Debug.Log("Áudio salvo em: " + filepath);
+    }
+
+    private void ReturnStep()
+    {
+        GameController.Instance.ReturnStep();
+    }
+
+    private void SendAudio()
+    {
+        // logica da API
+    }
+
+    private void NewAudio()
+    {
+        description.text = "Press Y to start recording...";
     }
 
     void SaveWav(string filepath, AudioClip clip)
@@ -96,5 +137,7 @@ public class RecordingController : MonoBehaviour
             // Dados de áudio
             fileStream.Write(bytesData, 0, bytesData.Length);
         }
+
+        description.text = "Recording saved!";
     }
 }
