@@ -2,28 +2,28 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class ChooseImageController : MonoBehaviour
+public class ChooseWayController : MonoBehaviour
 {
     [SerializeField] private Button nextButton;
     [SerializeField] private Button previousButton;
-    [SerializeField] private Button backBtn;
     [SerializeField] private Button chooseBtn;
 
     [SerializeField] private GameObject card;
 
     [SerializeField] private Sprite[] images;
+    [SerializeField] private string[] descriptions;
 
     private int currentIndex = 0;
-    // Start is called before the first frame update
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         nextButton.onClick.AddListener(NextCard);
         previousButton.onClick.AddListener(PreviousCard);
-        chooseBtn.onClick.AddListener(SetSkybox);
-        backBtn.onClick.AddListener(ReturnStep);
+        chooseBtn.onClick.AddListener(SetWay);
 
         // inicializa o card inicial
         card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = images[currentIndex];
+        card.transform.GetChild(0).GetChild(1).GetComponent<TMP_Text>().text = descriptions[currentIndex];
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
 
         int count = card.transform.GetChild(1).childCount;
@@ -31,7 +31,6 @@ public class ChooseImageController : MonoBehaviour
         {
             card.transform.GetChild(1).GetChild(ii).GetChild(0).gameObject.SetActive(false);
         }
-
     }
 
     private void NextCard()
@@ -39,10 +38,12 @@ public class ChooseImageController : MonoBehaviour
         currentIndex++;
 
         if (currentIndex >= images.Length)
-            currentIndex = images.Length-1;
-        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = images[currentIndex];
+            currentIndex = images.Length - 1;
 
-        card.transform.GetChild(1).GetChild(currentIndex-1).GetChild(0).gameObject.SetActive(false);
+        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = images[currentIndex];
+        card.transform.GetChild(0).GetChild(1).GetComponent<TMP_Text>().text = descriptions[currentIndex];
+
+        card.transform.GetChild(1).GetChild(currentIndex - 1).GetChild(0).gameObject.SetActive(false);
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
     }
 
@@ -54,19 +55,16 @@ public class ChooseImageController : MonoBehaviour
             currentIndex = 0;
 
         card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = images[currentIndex];
+        card.transform.GetChild(0).GetChild(1).GetComponent<TMP_Text>().text = descriptions[currentIndex];
 
-        card.transform.GetChild(1).GetChild(currentIndex+1).GetChild(0).gameObject.SetActive(false);
+        card.transform.GetChild(1).GetChild(currentIndex + 1).GetChild(0).gameObject.SetActive(false);
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
     }
-
-    private void SetSkybox()
+    private void SetWay()
     {
-        SkyBoxController.Instance.SetSkybox(currentIndex);
-        GameController.Instance.NextStep();
-    }
-
-    private void ReturnStep()
-    {
-        GameController.Instance.ReturnStep();
+        if(currentIndex ==0)
+            GameController.Instance.NextStep();
+        else
+            GameController.Instance.NextStep(2);
     }
 }

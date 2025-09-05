@@ -3,7 +3,7 @@ using UnityEngine;
 public class GameController : MonoBehaviour
 {
     public int currentStep = 0;
-    public int lastStep;
+    public int lastStep = 0;
 
     private static GameController _instance;
 

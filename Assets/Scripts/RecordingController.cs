@@ -8,38 +8,55 @@ using UnityEngine.XR;
 
 public class RecordingController : MonoBehaviour
 {
-    private AudioClip recordedClip;
     private string micDevice;
+    private AudioClip recordedClip;
     private bool isRecording = false;
+    private bool lastPressed = false;
     private List<InputDevice> devices = new List<InputDevice>();
-    public bool lastPressed = false;
 
-    [SerializeField] private GameObject spinner;
-    [SerializeField] private TMP_Text description;
-    [SerializeField] private Button sendAudioBtn;
-    [SerializeField] private Button newAudioBtn;
-    [SerializeField] private Button returnBtn;
+    private GameObject spinner;
+    private TMP_Text description;
+    private Button sendAudioBtn;
+    private Button newAudioBtn;
+    private Button returnBtn;
+
+    [SerializeField] private GameObject objectC;
+
+    private static RecordingController _instance;
+
+    // Singleton
+    public static RecordingController Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                _instance = FindFirstObjectByType<RecordingController>();
+                if (_instance == null)
+                {
+                    GameObject obj = new GameObject("RecordingController");
+                    _instance = obj.AddComponent<RecordingController>();
+                }
+            }
+            return _instance;
+        }
+    }
 
     void Start()
     {
-        returnBtn.onClick.AddListener(ReturnStep);
-        sendAudioBtn.onClick.AddListener(SendAudio);
-        newAudioBtn.onClick.AddListener(NewAudio);
-
         if (Microphone.devices.Length > 0)
             micDevice = Microphone.devices[0];
         else
             Debug.LogError("Nenhum microfone encontrado!");
     }
 
-    // Update is called once per frame
-    void Update()
+    private void Update()
     {
-        if (GameController.Instance.currentStep == 2)
+        if (GameController.Instance.currentStep == 3 || GameController.Instance.currentStep == 0)
         {
-            InputDeviceCharacteristics leftHandCharacteristics = InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller;
+            /*InputDeviceCharacteristics leftHandCharacteristics = InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller;
             InputDevices.GetDevicesWithCharacteristics(leftHandCharacteristics, devices);
-            devices[0].TryGetFeatureValue(CommonUsages.primaryButton, out bool isPressed);
+            devices[0].TryGetFeatureValue(CommonUsages.secondaryButton, out bool isPressed);
 
             if(isPressed && !lastPressed && !isRecording)
             {
@@ -49,7 +66,31 @@ public class RecordingController : MonoBehaviour
             {
                 StopAndSave();
             }
+
+            lastPressed = isPressed;*/
+
+            if (Input.GetKeyDown(KeyCode.L) && !isRecording)
+            {
+                StartRecording();
+            }
+            if (Input.GetKeyUp(KeyCode.L) && isRecording)
+            {
+                StopAndSave();
+            }
         }
+    }
+
+    public void SetAttributes(GameObject currentSp, TMP_Text desc, Button send, Button newAudio, Button back)
+    {
+        spinner = currentSp;
+        description = desc;
+        sendAudioBtn = send;
+        newAudioBtn = newAudio;
+        returnBtn = back;
+
+        returnBtn.onClick.AddListener(ReturnStep);
+        sendAudioBtn.onClick.AddListener(SendAudio);
+        newAudioBtn.onClick.AddListener(NewAudio);
     }
 
     void StartRecording()
@@ -140,4 +181,5 @@ public class RecordingController : MonoBehaviour
 
         description.text = "Recording saved!";
     }
+
 }

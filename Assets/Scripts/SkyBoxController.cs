@@ -34,7 +34,7 @@ public class SkyBoxController : MonoBehaviour
     }
     public void ResetExp()
     {
-        skyboxMaterial.SetTexture("_Tex", default);
+        skyboxMaterial.SetTexture("_Tex", defaultCubmap);
         RenderSettings.skybox = skyboxMaterial;
     }
 
