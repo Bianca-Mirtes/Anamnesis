@@ -62,11 +62,11 @@ public class ChooseImageController : MonoBehaviour
     private void SetSkybox()
     {
         SkyBoxController.Instance.SetSkybox(currentIndex);
-        GameController.Instance.NextStep();
+        StateController.Instance.SetState(State.Recording);
     }
 
     private void ReturnStep()
     {
-        GameController.Instance.ReturnStep();
+        StateController.Instance.SetState(StateController.Instance.GetLastState());
     }
 }

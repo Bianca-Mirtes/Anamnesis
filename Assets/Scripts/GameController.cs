@@ -2,9 +2,6 @@ using UnityEngine;
 
 public class GameController : MonoBehaviour
 {
-    public int currentStep = 0;
-    public int lastStep = 0;
-
     private static GameController _instance;
 
     // Singleton
@@ -25,34 +22,36 @@ public class GameController : MonoBehaviour
         }
     }
 
-    public void ReturnStep()
+    private void Update()
     {
-        transform.GetChild(currentStep).gameObject.SetActive(false);
-        transform.GetChild(lastStep).gameObject.SetActive(true);
-        currentStep = lastStep;
-
-        if (currentStep == 0)
-        {
-            SkyBoxController.Instance.ResetExp();
-            lastStep = 0;   
+        switch (StateController.Instance.GetState()) {
+            case State.ChooseWay:
+                transform.GetChild(0).gameObject.SetActive(true);
+                if((int)StateController.Instance.GetLastState() != (int)StateController.Instance.GetState())
+                    transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
+                break;
+            case State.ChooseImage:
+                transform.GetChild(2).gameObject.SetActive(true);
+                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
+                break;
+            case State.Recording:
+                transform.GetChild(1).gameObject.SetActive(true);
+                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
+                break;
+            case State.ChooseOptions:
+                transform.GetChild(3).gameObject.SetActive(true);
+                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
+                break;
+            case State.SettingPoints:
+                transform.GetChild(4).gameObject.SetActive(true);
+                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
+                break;
+            case State.ConsultingInventory:
+                transform.GetChild(5).gameObject.SetActive(true);
+                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
+                break;
+            default:
+                break;
         }
-
-    }
-
-    public void NextStep()
-    {
-        lastStep = currentStep;
-        currentStep++;
-        transform.GetChild(currentStep).gameObject.SetActive(true);
-        transform.GetChild(lastStep).gameObject.SetActive(false);
-    }
-
-    public void NextStep(int index)
-    {
-        lastStep = currentStep;
-        currentStep = index;
-
-        transform.GetChild(currentStep).gameObject.SetActive(true);
-        transform.GetChild(lastStep).gameObject.SetActive(false);
     }
 }

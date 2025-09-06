@@ -20,23 +20,23 @@ public class OptionsController : MonoBehaviour
     }
 
     private void AddObject() {
-        GameController.Instance.NextStep();
+        StateController.Instance.SetState(State.Recording);
     }
     private void RemoveObject() {
-        GameController.Instance.NextStep(3);
+        StateController.Instance.SetState(State.Recording);
     }
 
     private void CloneObject() {
-        GameController.Instance.NextStep();
+        StateController.Instance.SetState(State.SettingPoints);
     }
 
     private void GetOfTheDatabase() {
-        GameController.Instance.NextStep(4);
+        StateController.Instance.SetState(State.ConsultingInventory);
     }
 
     private void ReturnStep()
     {
-        GameController.Instance.ReturnStep();
+        StateController.Instance.SetState(StateController.Instance.GetLastState());
     }
 
 }

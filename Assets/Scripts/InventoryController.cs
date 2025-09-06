@@ -13,6 +13,6 @@ public class InventoryController : MonoBehaviour
 
     private void ReturnStep()
     {
-        GameController.Instance.ReturnStep();
+        StateController.Instance.SetState(StateController.Instance.GetLastState());
     }
 }
