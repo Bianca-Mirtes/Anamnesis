@@ -13,15 +13,15 @@ public class ObjectRecordingController : MonoBehaviour
     [SerializeField] private Button sendAudioBtn;
     [SerializeField] private Button newAudioBtn;
     [SerializeField] private Button returnBtn;
-
+    [SerializeField] private Button visualizeBtn;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        RecordingController.Instance.SetAttributes(spinner, description, sendAudioBtn, newAudioBtn, returnBtn);
+        RecordingController.Instance.SetAttributes(spinner, description, sendAudioBtn, newAudioBtn, returnBtn, visualizeBtn);
     }
 
     private void OnEnable()
     {
-        RecordingController.Instance.SetAttributes(spinner, description, sendAudioBtn, newAudioBtn, returnBtn);
+        RecordingController.Instance.SetAttributes(spinner, description, sendAudioBtn, newAudioBtn, returnBtn, visualizeBtn);
     }
 }

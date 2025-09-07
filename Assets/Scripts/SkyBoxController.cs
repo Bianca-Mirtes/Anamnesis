@@ -25,17 +25,27 @@ public class SkyBoxController : MonoBehaviour
         }
     }
 
+    public void ApplyCubemap(Cubemap cubemap)
+    {
+        skyboxMaterial.SetTexture("_Tex", cubemap);
+        RenderSettings.skybox = skyboxMaterial;
+        DynamicGI.UpdateEnvironment(); // atualiza iluminação global
+    }
+
+
     public void SetSkybox(int index)
     {
         Cubemap cubemap = cubemaps[index];
 
         skyboxMaterial.SetTexture("_Tex", cubemap);
         RenderSettings.skybox = skyboxMaterial;
+        DynamicGI.UpdateEnvironment(); // atualiza iluminação global
     }
     public void ResetExp()
     {
         skyboxMaterial.SetTexture("_Tex", defaultCubmap);
         RenderSettings.skybox = skyboxMaterial;
+        DynamicGI.UpdateEnvironment(); // atualiza iluminação global
     }
 
 }
