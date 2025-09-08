@@ -63,8 +63,14 @@ public class ChooseWayController : MonoBehaviour
     private void SetWay()
     {
         if (currentIndex == 0)
+        {
             StateController.Instance.SetState(State.Recording);
+            GameController.Instance.way = 0;
+        }
         else
+        {
             StateController.Instance.SetState(State.ChooseImage);
+            GameController.Instance.way = 1;
+        }
     }
 }

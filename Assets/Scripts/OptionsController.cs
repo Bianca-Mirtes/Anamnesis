@@ -23,7 +23,7 @@ public class OptionsController : MonoBehaviour
         StateController.Instance.SetState(State.Recording);
     }
     private void RemoveObject() {
-        StateController.Instance.SetState(State.Recording);
+        StateController.Instance.SetState(State.SettingPoints);
     }
 
     private void CloneObject() {

@@ -19,6 +19,7 @@ public class RecordingController : MonoBehaviour
     private bool lastPressed = false;
     private List<InputDevice> devices = new List<InputDevice>();
 
+    private int origin;
     private GameObject spinner;
     private TMP_Text description;
     private Button sendAudioBtn = null;
@@ -122,7 +123,7 @@ public class RecordingController : MonoBehaviour
     void Stop()
     {
         isRecording = false;
-        description.text = "Recording ended. Sending audio to API...";
+        description.text = "Recording ended!";
         spinner.SetActive(isRecording);
 
         // Pega quantos samples realmente foram gravados
@@ -138,41 +139,6 @@ public class RecordingController : MonoBehaviour
 
         trimmedClip = AudioClip.Create("TrimmedClip", position, recordedClip.channels, 44100, false);
         trimmedClip.SetData(trimmedSamples, 0);
-    }
-
-    private void StopAndSave()
-    {
-        isRecording = false;
-        description.text = "Recording ended. Saving audio file...";
-        description.gameObject.SetActive(true);
-        spinner.SetActive(isRecording);
-
-        // Pega quantos samples realmente foram gravados
-        int position = Microphone.GetPosition(micDevice);
-        Microphone.End(micDevice);
-
-        float[] samples = new float[recordedClip.samples * recordedClip.channels];
-        recordedClip.GetData(samples, 0);
-
-        // Cria um novo clip só com a parte usada
-        float[] trimmedSamples = new float[position * recordedClip.channels];
-        Array.Copy(samples, trimmedSamples, trimmedSamples.Length);
-
-        trimmedClip = AudioClip.Create("TrimmedClip", position, recordedClip.channels, 44100, false);
-        trimmedClip.SetData(trimmedSamples, 0);
-
-        string filename = "Gravacao_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".wav";
-#if UNITY_EDITOR
-        string folder = Path.Combine(Application.dataPath, "recordings");
-#else
-        string folder = Path.Combine(Application.persistentDataPath, "recordings");
-#endif
-        Directory.CreateDirectory(folder);
-
-        string filepath = Path.Combine(folder, filename);
-
-        SaveWav(filepath, trimmedClip);
-        Debug.Log("Áudio salvo em: " + filepath);
     }
 
     private void ReturnStep()
@@ -189,14 +155,28 @@ public class RecordingController : MonoBehaviour
         string base64Audio = Convert.ToBase64String(wavData);
 
         sessionId = UnityEngine.Random.Range(0, 1000);
+        if(origin == 0)
+        {
+            PayloadAudioGeneration payload = new PayloadAudioGeneration { audio_base64 = base64Audio, session_id = sessionId };
 
-        PayloadAudio payload = new PayloadAudio { audio_base64 = base64Audio, session_id = sessionId };
+            // 4) Serializa para JSON
+            string json = JsonUtility.ToJson(payload);
 
-        // 4) Serializa para JSON
-        string json = JsonUtility.ToJson(payload);
+            string url = "https://6c348d9d03dd.ngrok-free.app/generate_360";
 
-        // envia para API
-        StartCoroutine(SendToAPI(json));
+            // envia para API
+            StartCoroutine(SendToAPI(json, url));
+        }else if (origin == 1) // add
+        {
+            PayloadAudioGeneration payload = new PayloadAudioGeneration { audio_base64 = base64Audio, session_id = sessionId };
+
+            // 4) Serializa para JSON
+            string json = JsonUtility.ToJson(payload);
+
+            string url = "https://6c348d9d03dd.ngrok-free.app/generate_3d";
+            // envia para API
+            StartCoroutine(SendToAPI(json, url));
+        }
     }
 
     byte[] ConvertToWav(AudioClip clip)
@@ -238,11 +218,11 @@ public class RecordingController : MonoBehaviour
         return stream.ToArray();
     }
 
-    IEnumerator SendToAPI(string json)
+    IEnumerator SendToAPI(string json, string apiUrl)
     {
         description.text = "Waiting API response...";
         spinner.SetActive(true);
-        string apiUrl = "https://6c348d9d03dd.ngrok-free.app/generate_360";
+
         byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
         UnityWebRequest request = new UnityWebRequest(apiUrl, "POST");
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
@@ -253,40 +233,25 @@ public class RecordingController : MonoBehaviour
 
         if (request.result == UnityWebRequest.Result.Success)
         {
-            Debug.Log("Resposta: " + request.downloadHandler.text);
+            if (origin == 0)
+            {
+                Debug.Log("Resposta: " + request.downloadHandler.text);
 
-            // Aqui você pode deserializar o JSON de volta para um objeto
-            CubemapResponse response = JsonUtility.FromJson<CubemapResponse>(request.downloadHandler.text);
+                // Aqui você pode deserializar o JSON de volta para um objeto
+                CubemapResponse response = JsonUtility.FromJson<CubemapResponse>(request.downloadHandler.text);
 
-            Debug.Log("Status: " + response.status);
-            Debug.Log("Message: " + response.message);
+                Debug.Log("Status: " + response.status);
+                Debug.Log("Message: " + response.message);
 
-            BuildCubemap(response.cubemap_images);
+                BuildCubemap(response.cubemap_images);
+            }else if (origin == 1)
+            {
+                Model3DResponse response = JsonUtility.FromJson<Model3DResponse>(request.downloadHandler.text);
+                FindFirstObjectByType<InventoryController>().AddObject(response.image_base64, response.glb_base64);
+            }
         }
         else
             Debug.LogError("Erro API: " + request.error);
-    }
-    private void SaveBase64Images(string imagesBase64)
-    {
-#if UNITY_EDITOR
-        string folderPath = Path.Combine(Application.dataPath, "Cubemaps");
-#else
-        string folderPath = Path.Combine(Application.persistentDataPath, "Cubemaps");
-#endif
-        Directory.CreateDirectory(folderPath);
-
-        for (int i = 0; i < imagesBase64.Length; i++)
-        {
-            // Converte base64 → bytes
-            byte[] imgBytes = Convert.FromBase64String(imagesBase64);
-
-            // Salva como PNG
-            string filePath = Path.Combine(folderPath, $"cubemap_{i}.png");
-            File.WriteAllBytes(filePath, imgBytes);
-
-            Debug.Log($"Imagem salva: {filePath}");
-        }
-        StateController.Instance.SetState(State.ChooseOptions);
     }
 
     public void BuildCubemap(string[] imagesBase64, int resolution = 1024)
@@ -315,10 +280,24 @@ public class RecordingController : MonoBehaviour
             // Corrige a inversão vertical
             tex = FlipTextureY(tex);
 
+            if(i == 0)
+                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "left");
+            if(i == 1)
+                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "front");
+            if(i == 2)
+                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "right");
+            if(i == 3)
+                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "back");
             if (i == 4)
+            {
                 tex = RotateTexture(tex);
-            if(i == 5)
+                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "up");
+            }
+            if (i == 5)
+            {
                 tex = RotateTexture(tex, false);
+                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "down");
+            }
 
             // Copia pixels da textura para a face do cubemap
             Color[] pixels = tex.GetPixels();
@@ -385,55 +364,17 @@ public class RecordingController : MonoBehaviour
         return flipped;
     }
 
-
-    void SaveWav(string filepath, AudioClip clip)
+    [System.Serializable]
+    public class PayloadAudioGeneration
     {
-        if (clip == null) return;
-
-        using (FileStream fileStream = new FileStream(filepath, FileMode.Create))
-        {
-            int sampleCount = clip.samples * clip.channels;
-            float[] samples = new float[sampleCount];
-            clip.GetData(samples, 0);
-
-            // converte float [-1,1] para int16 PCM
-            short[] intData = new short[sampleCount];
-            byte[] bytesData = new byte[sampleCount * 2];
-
-            int rescaleFactor = 32767;
-            for (int i = 0; i < sampleCount; i++)
-            {
-                intData[i] = (short)(samples[i] * rescaleFactor);
-                BitConverter.GetBytes(intData[i]).CopyTo(bytesData, i * 2);
-            }
-
-            // Cabeçalho WAV
-            int sampleRate = clip.frequency;
-            int channels = clip.channels;
-            int byteRate = sampleRate * channels * 2;
-
-            fileStream.Write(System.Text.Encoding.UTF8.GetBytes("RIFF"), 0, 4);
-            fileStream.Write(BitConverter.GetBytes(36 + bytesData.Length), 0, 4);
-            fileStream.Write(System.Text.Encoding.UTF8.GetBytes("WAVE"), 0, 4);
-            fileStream.Write(System.Text.Encoding.UTF8.GetBytes("fmt "), 0, 4);
-            fileStream.Write(BitConverter.GetBytes(16), 0, 4); // Subchunk1Size (16 for PCM)
-            fileStream.Write(BitConverter.GetBytes((short)1), 0, 2); // AudioFormat = 1 (PCM)
-            fileStream.Write(BitConverter.GetBytes((short)channels), 0, 2);
-            fileStream.Write(BitConverter.GetBytes(sampleRate), 0, 4);
-            fileStream.Write(BitConverter.GetBytes(byteRate), 0, 4);
-            fileStream.Write(BitConverter.GetBytes((short)(channels * 2)), 0, 2); // BlockAlign
-            fileStream.Write(BitConverter.GetBytes((short)16), 0, 2); // BitsPerSample
-            fileStream.Write(System.Text.Encoding.UTF8.GetBytes("data"), 0, 4);
-            fileStream.Write(BitConverter.GetBytes(bytesData.Length), 0, 4);
-
-            // Dados de áudio
-            fileStream.Write(bytesData, 0, bytesData.Length);
-        }
+        public string audio_base64;
+        public int session_id;
     }
 
     [System.Serializable]
-    public class PayloadAudio
+    public class PayloadAudioImageEdit
     {
+        public string image_base64;
         public string audio_base64;
         public int session_id;
     }
@@ -444,5 +385,23 @@ public class RecordingController : MonoBehaviour
         public string status;
         public string message;
         public string[] cubemap_images; // cada imagem vem em Base64
+    }
+
+    [System.Serializable]
+    public class Model3DResponse
+    {
+        public string status;
+        public string message;
+        public string glb_base64;
+        public string image_base64;
+    }
+
+    [System.Serializable]
+    public class Clone3DResponse
+    {
+        public string status;
+        public string message;
+        public string glb_base64;
+        public string image_base64;
     }
 }

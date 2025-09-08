@@ -3,6 +3,7 @@ using UnityEngine;
 public class GameController : MonoBehaviour
 {
     private static GameController _instance;
+    public int way = -1;
 
     // Singleton
     public static GameController Instance
