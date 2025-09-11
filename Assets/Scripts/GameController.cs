@@ -3,8 +3,11 @@ using UnityEngine;
 public class GameController : MonoBehaviour
 {
     private static GameController _instance;
-    public int way = -1;
+    public int session_id { get; set; }
 
+    public GameObject ObjectStorage;
+
+    public int currentWay = -1;
     // Singleton
     public static GameController Instance
     {
@@ -23,36 +26,23 @@ public class GameController : MonoBehaviour
         }
     }
 
-    private void Update()
+    public void ChangeState(State state)
     {
-        switch (StateController.Instance.GetState()) {
-            case State.ChooseWay:
-                transform.GetChild(0).gameObject.SetActive(true);
-                if((int)StateController.Instance.GetLastState() != (int)StateController.Instance.GetState())
-                    transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
-                break;
-            case State.ChooseImage:
-                transform.GetChild(2).gameObject.SetActive(true);
-                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
-                break;
-            case State.Recording:
-                transform.GetChild(1).gameObject.SetActive(true);
-                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
-                break;
-            case State.ChooseOptions:
-                transform.GetChild(3).gameObject.SetActive(true);
-                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
-                break;
-            case State.SettingPoints:
-                transform.GetChild(4).gameObject.SetActive(true);
-                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
-                break;
-            case State.ConsultingInventory:
-                transform.GetChild(5).gameObject.SetActive(true);
-                transform.GetChild((int)StateController.Instance.GetLastState()).gameObject.SetActive(false);
-                break;
-            default:
-                break;
+        // Desativa todos os filhos (todos os canvases)
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            transform.GetChild(i).gameObject.SetActive(false);
         }
+
+        // Ativa só o painel do estado atual
+        transform.GetChild((int)state).gameObject.SetActive(true);
+
+        // Atualiza o controlador de estados
+        StateController.Instance.SetState(state);
+    }
+
+    public void SpawnObject3D()
+    {
+
     }
 }

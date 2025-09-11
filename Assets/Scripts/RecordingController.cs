@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using TMPro;
 using Unity.Mathematics;
@@ -14,24 +15,28 @@ public class RecordingController : MonoBehaviour
 {
     private string micDevice;
     private AudioClip recordedClip;
-    private AudioClip trimmedClip;
+    private AudioClip trimmedClip = null;
     private bool isRecording = false;
     private bool lastPressed = false;
     private List<InputDevice> devices = new List<InputDevice>();
 
-    private int origin;
     private GameObject spinner;
     private TMP_Text description;
     private Button sendAudioBtn = null;
     private Button newAudioBtn = null;
     private Button visualizeBtn = null;
     private Button returnBtn = null;
-    private int sessionId;
+    private string baseUrl;
     [SerializeField] private GameObject objectC;
 
     private Cubemap result;
+    private Dictionary<FaceName, string> facesGenerated;
+
+    private string imageObj_base64 = "";
+    private string obj_base64 = "";
 
     private static RecordingController _instance;
+    private bool wasSend = false;
 
     // Singleton
     public static RecordingController Instance
@@ -53,6 +58,7 @@ public class RecordingController : MonoBehaviour
 
     void Start()
     {
+        baseUrl = "https://4dbbb1e6032f.ngrok-free.app";
         // Se ainda não tem a permissão, pede
         if (!Application.HasUserAuthorization(UserAuthorization.Microphone))
         {
@@ -143,40 +149,178 @@ public class RecordingController : MonoBehaviour
 
     private void ReturnStep()
     {
-        StateController.Instance.SetState(StateController.Instance.GetLastState());
+        GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
     }
 
     private void SendAudio()
     {
-        // converte para bytes WAV
-        byte[] wavData = ConvertToWav(trimmedClip);
+        if (trimmedClip == null)
+            return;
 
-        // converte para Base64
-        string base64Audio = Convert.ToBase64String(wavData);
-
-        sessionId = UnityEngine.Random.Range(0, 1000);
-        if(origin == 0)
+        if (!wasSend) 
         {
-            PayloadAudioGeneration payload = new PayloadAudioGeneration { audio_base64 = base64Audio, session_id = sessionId };
+            // converte para bytes WAV
+            byte[] wavData = ConvertToWav(trimmedClip);
 
-            // 4) Serializa para JSON
-            string json = JsonUtility.ToJson(payload);
+            // converte para Base64
+            string base64Audio = Convert.ToBase64String(wavData);
 
-            string url = "https://6c348d9d03dd.ngrok-free.app/generate_360";
+            GameController.Instance.session_id = UnityEngine.Random.Range(0, 1000);
+            if(FuncionalityController.Instance.GetFuncionality() == Funcionality.WORLD_GENERATION)
+            {
+                PayloadAudioGeneration payload = new PayloadAudioGeneration { audio_base64 = base64Audio, session_id = GameController.Instance.session_id };
 
-            // envia para API
-            StartCoroutine(SendToAPI(json, url));
-        }else if (origin == 1) // add
-        {
-            PayloadAudioGeneration payload = new PayloadAudioGeneration { audio_base64 = base64Audio, session_id = sessionId };
+                // 4) Serializa para JSON
+                string json = JsonUtility.ToJson(payload);
 
-            // 4) Serializa para JSON
-            string json = JsonUtility.ToJson(payload);
+                string url = $"{baseUrl}/generate_360";
 
-            string url = "https://6c348d9d03dd.ngrok-free.app/generate_3d";
-            // envia para API
-            StartCoroutine(SendToAPI(json, url));
+                // envia para API
+                StartCoroutine(SendToAPI(json, url));
+            } else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD) // add
+            {
+                PayloadAudioGeneration payload = new PayloadAudioGeneration { audio_base64 = base64Audio, session_id = GameController.Instance.session_id };
+
+                // 4) Serializa para JSON
+                string json = JsonUtility.ToJson(payload);
+
+                string url = $"{baseUrl}/generate_3d_64";
+                // envia para API
+                StartCoroutine(SendToAPI(json, url));
+            }else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
+            {
+                string base64Image = FindFirstObjectByType<SettingPointsController>().GetImageInBase64(); 
+                List<PointFacePair> payload_frag = new List<PointFacePair>();
+                List<Vector2> coords = FindFirstObjectByType<SettingPointsController>().GetCoords();
+                if (coords.Count == 2)
+                {
+                    PointFacePair pair = new PointFacePair();
+                    pair.point[0] = new Point(coords[0].x, coords[0].y);
+                    pair.point[1] = new Point(coords[1].x, coords[1].y);
+
+                    CubemapFace currentFa = FindFirstObjectByType<SettingPointsController>().GetCurrentFace()[0];
+
+                    if (currentFa == CubemapFace.NegativeX)
+                    {
+                        pair.faceName = FaceName.LEFT;
+                    }
+                    if (currentFa == CubemapFace.PositiveX)
+                    {
+                        pair.faceName = FaceName.RIGTH;
+                    }
+                    if (currentFa == CubemapFace.PositiveZ)
+                    {
+                        pair.faceName = FaceName.FRONT;
+                    }
+                    if (currentFa == CubemapFace.PositiveY)
+                    {
+                        pair.faceName = FaceName.UP;
+                    }
+                    if (currentFa == CubemapFace.NegativeY)
+                    {
+                        pair.faceName = FaceName.DOWN;
+                    }
+                    if (currentFa == CubemapFace.NegativeZ)
+                    {
+                        pair.faceName = FaceName.BACK;
+                    }
+                    payload_frag.Add(pair);
+                }
+                else
+                {
+                    PointFacePair pair1 = new PointFacePair();
+                    pair1.point[0] = new Point(coords[0].x, coords[0].y);
+                    pair1.point[1] = new Point(coords[1].x, coords[1].y);
+
+                    List<CubemapFace> currentFa = FindFirstObjectByType<SettingPointsController>().GetCurrentFace();
+
+                    if (currentFa[0] == CubemapFace.NegativeX)
+                    {
+                        pair1.faceName = FaceName.LEFT;
+                    }
+                    if (currentFa[0] == CubemapFace.PositiveX)
+                    {
+                        pair1.faceName = FaceName.RIGTH;
+                    }
+                    if (currentFa[0] == CubemapFace.PositiveZ)
+                    {
+                        pair1.faceName = FaceName.FRONT;
+                    }
+                    if (currentFa[0] == CubemapFace.PositiveY)
+                    {
+                        pair1.faceName = FaceName.UP;
+                    }
+                    if (currentFa[0] == CubemapFace.NegativeY)
+                    {
+                        pair1.faceName = FaceName.DOWN;
+                    }
+                    if (currentFa[0] == CubemapFace.NegativeZ)
+                    {
+                        pair1.faceName = FaceName.BACK;
+                    }
+
+                    PointFacePair pair2 = new PointFacePair();
+                    pair2.point[0] = new Point(coords[2].x, coords[2].y);
+                    pair2.point[1] = new Point(coords[3].x, coords[3].y);
+
+                    if (currentFa[1] == CubemapFace.NegativeX)
+                    {
+                        pair1.faceName = FaceName.LEFT;
+                    }
+                    if (currentFa[1] == CubemapFace.PositiveX)
+                    {
+                        pair1.faceName = FaceName.RIGTH;
+                    }
+                    if (currentFa[1] == CubemapFace.PositiveZ)
+                    {
+                        pair1.faceName = FaceName.FRONT;
+                    }
+                    if (currentFa[1] == CubemapFace.PositiveY)
+                    {
+                        pair1.faceName = FaceName.UP;
+                    }
+                    if (currentFa[1] == CubemapFace.NegativeY)
+                    {
+                        pair1.faceName = FaceName.DOWN;
+                    }
+                    if (currentFa[1] == CubemapFace.NegativeZ)
+                    {
+                        pair1.faceName = FaceName.BACK;
+                    }
+                }
+
+                PayloadRemove payload = new PayloadRemove { image_base64 = base64Image, 
+                    audio_base64 = base64Audio, 
+                    session_id = GameController.Instance.session_id,
+                    points = payload_frag
+                };
+
+                // 4) Serializa para JSON
+                string json = JsonUtility.ToJson(payload);
+
+                string url = $"{baseUrl}/process_image";
+                // envia para API
+                StartCoroutine(SendToAPI(json, url));
+            }
+            else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.CLONE)
+            {
+                PayloadAudioGeneration payload = new PayloadAudioGeneration { audio_base64 = base64Audio, session_id = GameController.Instance.session_id };
+
+                // 4) Serializa para JSON
+                string json = JsonUtility.ToJson(payload);
+
+                string url = $"{baseUrl}/clone_3d";
+            }
+            wasSend = true;
+            Invoke("ResetSend", 5f);
         }
+    }
+
+    private void ResetSend()
+    {
+        wasSend = false;
+        trimmedClip = null;
     }
 
     byte[] ConvertToWav(AudioClip clip)
@@ -233,7 +377,7 @@ public class RecordingController : MonoBehaviour
 
         if (request.result == UnityWebRequest.Result.Success)
         {
-            if (origin == 0)
+            if (FuncionalityController.Instance.GetFuncionality() == Funcionality.WORLD_GENERATION)
             {
                 Debug.Log("Resposta: " + request.downloadHandler.text);
 
@@ -243,125 +387,127 @@ public class RecordingController : MonoBehaviour
                 Debug.Log("Status: " + response.status);
                 Debug.Log("Message: " + response.message);
 
-                BuildCubemap(response.cubemap_images);
-            }else if (origin == 1)
+                result = SkyBoxController.Instance.BuildCubemap(response.cubemap_images);
+                spinner.SetActive(false);
+                description.text = "World generated!";
+            }
+            else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
             {
                 Model3DResponse response = JsonUtility.FromJson<Model3DResponse>(request.downloadHandler.text);
-                FindFirstObjectByType<InventoryController>().AddObject(response.image_base64, response.glb_base64);
+                imageObj_base64 = response.image_base64;
+                obj_base64 = response.glb_base64;
+                description.text = "Object 3D generated!";
+            }
+            else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
+            {
+                ImageEditResponse response = JsonUtility.FromJson<ImageEditResponse>(request.downloadHandler.text);
+                facesGenerated = response.images_base64;
+                description.text = "Object removed!";
+            }
+            else if(FuncionalityController.Instance.GetFuncionality() == Funcionality.CLONE) {
+                Model3DResponse response = JsonUtility.FromJson<Model3DResponse>(request.downloadHandler.text);
+                imageObj_base64 = response.image_base64;
+                obj_base64 = response.glb_base64;
+                description.text = "Clone generated!";
             }
         }
         else
             Debug.LogError("Erro API: " + request.error);
     }
 
-    public void BuildCubemap(string[] imagesBase64, int resolution = 1024)
-    {
-        // Cria um cubemap vazio
-        Cubemap cubemap = new Cubemap(resolution, TextureFormat.RGBA32, false);
-
-        // As 6 faces do cubemap
-        CubemapFace[] faces = new CubemapFace[]
-        {
-            CubemapFace.NegativeX, // esquerda
-            CubemapFace.PositiveZ, // frente
-            CubemapFace.PositiveX, // direita
-            CubemapFace.NegativeZ, // trás
-            CubemapFace.PositiveY, // cima
-            CubemapFace.NegativeY, // baixo
-        };
-
-        for (int i = 0; i < imagesBase64.Length && i < 6; i++)
-        {
-            byte[] imgBytes = Convert.FromBase64String(imagesBase64[i]);
-
-            Texture2D tex = new Texture2D(2, 2);
-            tex.LoadImage(imgBytes);
-
-            // Corrige a inversão vertical
-            tex = FlipTextureY(tex);
-
-            if(i == 0)
-                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "left");
-            if(i == 1)
-                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "front");
-            if(i == 2)
-                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "right");
-            if(i == 3)
-                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "back");
-            if (i == 4)
-            {
-                tex = RotateTexture(tex);
-                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "up");
-            }
-            if (i == 5)
-            {
-                tex = RotateTexture(tex, false);
-                FindFirstObjectByType<SettingPointsController>().SetWorldTextures(tex, "down");
-            }
-
-            // Copia pixels da textura para a face do cubemap
-            Color[] pixels = tex.GetPixels();
-            cubemap.SetPixels(pixels, faces[i]);
-        }
-
-        cubemap.Apply();
-
-        result = cubemap;
-        spinner.SetActive(false);
-        description.text = "World generated!";
-    }
-
     private void Visualize()
     {
-        if (result != null)
+        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.WORLD_GENERATION)
         {
-            SkyBoxController.Instance.ApplyCubemap(result);
-            StateController.Instance.SetState(State.ChooseOptions);
-        }
-    }
-
-    Texture2D RotateTexture(Texture2D original, bool clockwise = true)
-    {
-        Color32[] originalPixels = original.GetPixels32();
-        Color32[] newPixels = new Color32[originalPixels.Length];
-
-        int w = original.width;
-        int h = original.height;
-
-        for (int x = 0; x < w; x++)
-        {
-            for (int y = 0; y < h; y++)
-            {
-                int newX = clockwise ? h - y - 1 : y;
-                int newY = clockwise ? x : w - x - 1;
-                newPixels[newY * h + newX] = originalPixels[y * w + x];
+            if (result != null) 
+            { 
+                SkyBoxController.Instance.ApplyCubemap(result);
+                GameController.Instance.ChangeState(State.ChooseOptions);
             }
         }
-
-        Texture2D rotated = new Texture2D(h, w);
-        rotated.SetPixels32(newPixels);
-        rotated.Apply();
-        return rotated;
+        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
+        {
+            if (facesGenerated != null)
+            {
+                List<FaceName> currentF = new List<FaceName>();
+                List<string> currentI = new List<string>();
+                List<CubemapFace> faces = new List<CubemapFace>();
+                if (facesGenerated.Count > 1)
+                {
+                    foreach (KeyValuePair<FaceName, string> obj in facesGenerated)
+                    {
+                        currentF.Add(obj.Key);
+                        currentI.Add(obj.Value);
+                        if (currentF[0] == FaceName.LEFT)
+                        {
+                            faces.Add(CubemapFace.NegativeX);
+                        }
+                        if (currentF[0] == FaceName.RIGTH)
+                        {
+                            faces.Add(CubemapFace.PositiveX);
+                        }
+                        if (currentF[0] == FaceName.FRONT)
+                        {
+                            faces.Add(CubemapFace.PositiveZ);
+                        }
+                        if (currentF[0] == FaceName.UP)
+                        {
+                            faces.Add(CubemapFace.PositiveY);
+                        }
+                        if (currentF[0] == FaceName.BACK)
+                        {
+                            faces.Add(CubemapFace.NegativeZ);
+                        }
+                        if (currentF[0] == FaceName.DOWN)
+                        {
+                            faces.Add(CubemapFace.NegativeY);
+                        }
+                    }
+                } else {
+                    currentF.Add(facesGenerated.First().Key);
+                    currentI.Add(facesGenerated.First().Value);
+                    if (currentF[0] == FaceName.LEFT)
+                    {
+                        faces[0] = CubemapFace.NegativeX;
+                    }
+                    if (currentF[0] == FaceName.RIGTH)
+                    {
+                        faces[0] = CubemapFace.PositiveX;
+                    }
+                    if (currentF[0] == FaceName.FRONT)
+                    {
+                        faces[0] = CubemapFace.PositiveZ;
+                    }
+                    if (currentF[0] == FaceName.UP)
+                    {
+                        faces[0] = CubemapFace.PositiveY;
+                    }
+                    if (currentF[0] == FaceName.BACK)
+                    {
+                        faces[0] = CubemapFace.NegativeZ;
+                    }
+                    if (currentF[0] == FaceName.DOWN)
+                    {
+                        faces[0] = CubemapFace.NegativeY;
+                    }
+                }
+                SkyBoxController.Instance.BuildCubemap(FindFirstObjectByType<ChooseImageController>().GetCurrentFaces(), faces, currentI);
+            }
+        }
+        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
+        {
+            if(imageObj_base64 != "" && obj_base64 != "")
+                FindFirstObjectByType<InventoryController>().AddObject(imageObj_base64, obj_base64);
+        }
+        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.CLONE) {
+            if (imageObj_base64 != "" && obj_base64 != "")
+                FindFirstObjectByType<InventoryController>().AddObject(imageObj_base64, obj_base64);
+        }
     }
 
     private void NewAudio()
     {
         description.text = "Press Y to start recording...";
-    }
-    Texture2D FlipTextureY(Texture2D original)
-    {
-        Texture2D flipped = new Texture2D(original.width, original.height, original.format, false);
-
-        int width = original.width;
-        int height = original.height;
-
-        for (int y = 0; y < height; y++)
-        {
-            flipped.SetPixels(0, y, width, 1, original.GetPixels(0, height - 1 - y, width, 1));
-        }
-
-        flipped.Apply();
-        return flipped;
     }
 
     [System.Serializable]
@@ -372,7 +518,37 @@ public class RecordingController : MonoBehaviour
     }
 
     [System.Serializable]
-    public class PayloadAudioImageEdit
+    public class PayloadRemove
+    {
+        public string image_base64;
+        public string audio_base64;
+        public int session_id;
+        public List<PointFacePair> points;
+    }
+
+    [System.Serializable]
+    public class Point
+    {
+        public float x;
+        public float y;
+        public Point(float coord_x, float coord_y)
+        {
+            x = coord_x;
+            y = coord_y;
+        }
+    }
+
+
+    [System.Serializable]
+    public class PointFacePair
+    {
+        public Point[] point = new Point[2];
+        public FaceName faceName;
+    }
+
+
+    [System.Serializable]
+    public class PayloadClone3D
     {
         public string image_base64;
         public string audio_base64;
@@ -384,7 +560,7 @@ public class RecordingController : MonoBehaviour
     {
         public string status;
         public string message;
-        public string[] cubemap_images; // cada imagem vem em Base64
+        public string[] cubemap_images; 
     }
 
     [System.Serializable]
@@ -396,12 +572,20 @@ public class RecordingController : MonoBehaviour
         public string image_base64;
     }
 
-    [System.Serializable]
-    public class Clone3DResponse
+    public class ImageEditResponse
     {
         public string status;
         public string message;
-        public string glb_base64;
-        public string image_base64;
+        public Dictionary<FaceName, string> images_base64; 
+    }
+
+    public enum FaceName
+    {
+        LEFT,
+        FRONT,
+        RIGTH,
+        BACK,
+        UP,
+        DOWN
     }
 }

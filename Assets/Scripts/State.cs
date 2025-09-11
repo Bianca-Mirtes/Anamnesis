@@ -3,8 +3,8 @@ using UnityEngine;
 public enum State
 {
     ChooseWay,
-    ChooseImage,
     Recording,
+    ChooseImage,
     ChooseOptions,
     SettingPoints,
     ConsultingInventory

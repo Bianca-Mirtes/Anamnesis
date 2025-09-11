@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,7 +19,9 @@ public class ChooseImageController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI categoryText;
     [SerializeField] private Button backBtn;
 
+    private bool stateChanged = false;
     private Category currentCategory;
+    private string[] images64base;
 
     private int currentIndex = 0;
     private int currentCategoryIndex = 0;
@@ -101,14 +104,34 @@ public class ChooseImageController : MonoBehaviour
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
     }
 
+    public string[] GetCurrentFaces()
+    {
+        return images64base;
+    }
+
     private void SetSkybox()
     {
-        //SkyBoxController.Instance.SetSkybox(currentIndex);
-        StateController.Instance.SetState(State.ChooseOptions);
+        if (!stateChanged)
+        {
+            images64base = new string[6];
+            for(int ii=0; ii < currentCategory.faces.Length; ii++)
+            {
+                byte[] textureBytes = currentCategory.faces[ii].EncodeToPNG();
+                // converte para Base64
+                string base64Image = Convert.ToBase64String(textureBytes);
+                images64base[ii] = base64Image;
+            }
+
+            Cubemap result = SkyBoxController.Instance.BuildCubemap(images64base);
+            SkyBoxController.Instance.ApplyCubemap(result);
+            GameController.Instance.ChangeState(State.ChooseOptions); 
+            stateChanged = true;
+        }
     }
 
     private void ReturnStep()
     {
-        StateController.Instance.SetState(StateController.Instance.GetLastState());
+        GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        SkyBoxController.Instance.ResetExp();
     }
 }

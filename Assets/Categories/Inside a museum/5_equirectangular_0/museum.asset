@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a59dc0fa045df54e9bae38f7d9e52f7, type: 3}
+  m_Name: museum
+  m_EditorClassIdentifier: 
+  name: Inside a Museum
+  images:
+  - {fileID: 21300000, guid: fbe425a58065b7340a758bcfd5fe5e7a, type: 3}
+  faces:
+  - {fileID: 2800000, guid: 36a4076345756ae4e98b4049a6fae838, type: 3}
+  - {fileID: 2800000, guid: 9927f9a55564664418669b942eb745ce, type: 3}
+  - {fileID: 2800000, guid: 3a1345655a4f99e4eabfdf76547c4c88, type: 3}
+  - {fileID: 2800000, guid: 92c8b5c3ee6ad014c92f403ab9b7717b, type: 3}
+  - {fileID: 2800000, guid: 694f90482f169b644bdf6b51ac92bfad, type: 3}
+  - {fileID: 2800000, guid: 92cfdc08191d9d84c8d94776bb5f8135, type: 3}

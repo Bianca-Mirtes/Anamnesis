@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.UI;
+using GLTFast;
+using System.Threading.Tasks;
 
 public class InventoryController : MonoBehaviour
 {
@@ -14,7 +17,6 @@ public class InventoryController : MonoBehaviour
     private Dictionary<Sprite, GameObject> objects;
     private int count=0;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         returnBtn.onClick.AddListener(ReturnStep);
@@ -22,19 +24,18 @@ public class InventoryController : MonoBehaviour
 
     private void ReturnStep()
     {
-        StateController.Instance.SetState(StateController.Instance.GetLastState());
+        GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
     }
 
-    public void AddObject(string image_base64, string glb_base64)
+    public async void AddObject(string image_base64, string glb_base64)
     {
-
         byte[] glbBytes = Convert.FromBase64String(glb_base64);
 
-        // 2. Caminho de saída no disco
-        string path = Path.Combine(Application.persistentDataPath, "modelo.glb");
+        await SpawnGlbBytes(glbBytes);
 
-        // 3. Salva como .glb
-        File.WriteAllBytes(path, glbBytes);
+        // 2. Caminho de saída no disco
+        //string path = Path.Combine(Application.persistentDataPath, "modelo.glb");
 
         byte[] imgBytes = Convert.FromBase64String(image_base64);
         string path2 = Path.Combine(Application.persistentDataPath, "modelo" + count +".png");
@@ -57,12 +58,39 @@ public class InventoryController : MonoBehaviour
         obj.GetComponent<Image>().sprite = sprite;
 
         objects.Add(sprite, obj);
+    }
 
-        //obj.GetComponent<Button>().onClick.AddListener(()=>OnClick());
+    /// <summary>
+    /// Usa glTFast para carregar GLB a partir de bytes e instanciar na cena.
+    /// </summary>
+    public async Task SpawnGlbBytes(byte[] glbBytes)
+    {
+        var gltf = new GltfImport();
+
+        // Assinatura correta do glTFast
+        var success = await gltf.Load(glbBytes, null, new ImportSettings());
+        if (!success)
+        {
+            Debug.LogError("[GlbSpawnFromBase64] glTFast falhou ao carregar o GLB.");
+            return;
+        }
+
+        bool instantiated = await gltf.InstantiateMainSceneAsync(GameController.Instance.ObjectStorage.transform);
+        if (!instantiated)
+        {
+            Debug.LogError("[GlbSpawnFromBase64] Falha ao instanciar cena principal do GLB.");
+            return;
+        }
     }
 
     private void OnClick(GameObject model)
     {
+        Instantiate(model, content);
+    }
 
+    [System.Serializable]
+    public class ZipResponse
+    {
+        public string zipFileBase64;
     }
 }

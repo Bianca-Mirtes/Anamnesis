@@ -1,47 +1,70 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using TMPro;
+using UnityEditor.Overlays;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
-using static RecordingController;
 
 public class SettingPointsController : MonoBehaviour
 {
     public XRRayInteractor rayInteractor; // arraste seu Ray Interactor aqui
-    private WorldTexture worldTextures;
-    private CubemapFace currentFace;
+
+    private List<CubemapFace> currentFaces;
+    private Cubemap currentCubemap;
+    private Texture2D result;
+    private List<Vector2> coords;
+
     public Texture2D hdrTexture;
     [SerializeField] private TextMeshProUGUI description;
     [SerializeField] private Button sendBtn;
-
-    private Vector2[] points = new Vector2[2];
+    [SerializeField] private Button backBtn;
+    private Vector3[] directions = new Vector3[2];
     private int pointIndex = 0;
-    private Texture2D box;
-
-    public void SetWorldTextures(Texture2D tex, string local)
-    {
-        if (local == "back")
-            worldTextures.back = tex;
-        if(local == "up")
-            worldTextures.up = tex;
-        if(local == "left")
-            worldTextures.left = tex;
-        if(local =="right")
-            worldTextures.right = tex;
-        if(local == "down")
-            worldTextures.down = tex;
-        if (local == "front")
-            worldTextures.front = tex;
-    }
 
     public void SethdrTexture(Texture2D tex)
     {
         hdrTexture = tex;
+    }
+
+    public void SetCubemap(Cubemap cub)
+    {
+        currentCubemap = cub;
+    }
+
+    public List<CubemapFace> GetCurrentFace()
+    {
+        return currentFaces;
+    }
+
+    public List<Vector2> GetCoords()
+    {
+        return coords;
+    }
+
+    public string GetImageInBase64()
+    {
+        byte[] textureBytes = result.EncodeToPNG();
+        // converte para Base64
+        string base64Image = Convert.ToBase64String(textureBytes);
+        return base64Image;
+    }
+
+    private void Start()
+    {
+        sendBtn.onClick.AddListener(() => GameController.Instance.ChangeState(State.Recording));
+        backBtn.onClick.AddListener(ReturnStep);
+    }
+
+    private void ReturnStep()
+    {
+        GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
     }
 
     // Update is called once per frame
@@ -52,56 +75,30 @@ public class SettingPointsController : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.Space)) // aqui use o input VR do seu controle
             {
                 description.text = $"Setting the point {pointIndex + 1}...";
+                Debug.Log($"Setting the point {pointIndex + 1}...");
                 // Pega a direção do raio
                 Vector3 dir = rayInteractor.rayOriginTransform.forward.normalized;
 
-                if (GameController.Instance.way == 1)
+                directions[pointIndex] = dir;
+
+                pointIndex++;
+
+                // Se já tiver 2 pontos, faz o crop
+                if (pointIndex >= 2)
                 {
-                    // corrige alinhamento do HDR (gira 180° no eixo Y)
-                    dir = new Vector3(-dir.x, dir.y, -dir.z);
+                    result = CropBoxFromDirections(currentCubemap, directions[0], directions[1]);
 
-                    // converte para UV
-                    float u = 0.5f + (Mathf.Atan2(dir.z, dir.x) / (2 * Mathf.PI));
-                    float v = 0.5f - (Mathf.Asin(dir.y) / Mathf.PI);
+                    string folderPath = Path.Combine(Application.dataPath, "croppeds");
+                    Directory.CreateDirectory(folderPath);
 
-                    points[pointIndex] = new Vector2(u, v);
-                    Debug.Log($"Ponto {pointIndex + 1} capturado: {points[pointIndex]}");
+                    int id = UnityEngine.Random.Range(0, 1000);
 
-                    pointIndex++;
+                    byte[] image = result.EncodeToPNG();
+                    string filePath = Path.Combine(folderPath, $"cropped_{id}.png");
+                    File.WriteAllBytes(filePath, image);
 
-                    // Se já tiver 2 pontos, faz o crop
-                    if (pointIndex >= 2)
-                    {
-                        CropHDR();
-                        pointIndex = 0; // resetar para capturar novamente
-                    }
-                }
-                else
-                {
-                    Tuple<float, float> coords = FindFace(dir);
-
-                    points[pointIndex] = new Vector2(coords.Item1, coords.Item2);
-                    Debug.Log($"Ponto {pointIndex + 1} capturado: {points[pointIndex]}");
-
-                    pointIndex++;
-
-                    // Se já tiver 2 pontos, faz o crop
-                    if (pointIndex >= 2)
-                    {
-                        if (currentFace == CubemapFace.NegativeX)
-                            Crop(worldTextures.left, points[0], points[1]);
-                        if (currentFace == CubemapFace.PositiveZ)
-                            Crop(worldTextures.front, points[0], points[1]);
-                        if (currentFace == CubemapFace.PositiveX)
-                            Crop(worldTextures.right, points[0], points[1]);
-                        if (currentFace == CubemapFace.NegativeZ)
-                            Crop(worldTextures.back, points[0], points[1]);
-                        if (currentFace == CubemapFace.PositiveY)
-                            Crop(worldTextures.up, points[0], points[1]);
-                        if (currentFace == CubemapFace.NegativeY)
-                            Crop(worldTextures.down, points[0], points[1]);
-                        pointIndex = 0; // resetar para capturar novamente
-                    }
+                    description.text = " 2 pontod set!";
+                    pointIndex = 0; // resetar para capturar novamente
                 }
             }
         }
@@ -125,162 +122,71 @@ public class SettingPointsController : MonoBehaviour
         return readableTex;
     }
 
-    void CropHDR()
+    // pontos em faces diferentes (case hdrTex)
+    public static Texture2D CropBox(Texture2D hdrTex, Vector2 uvA, Vector2 uvB)
     {
-        if (hdrTexture == null)
+        // normaliza UV (0..1)
+        float u1 = Mathf.Repeat(uvA.x, 1f);
+        float v1 = Mathf.Clamp01(uvA.y);
+        float u2 = Mathf.Repeat(uvB.x, 1f);
+        float v2 = Mathf.Clamp01(uvB.y);
+
+        // garante u1 <= u2, v1 <= v2
+        if (u1 > u2) { float tmp = u1; u1 = u2; u2 = tmp; }
+        if (v1 > v2) { float tmp = v1; v1 = v2; v2 = tmp; }
+
+        int w = hdrTex.width;
+        int h = hdrTex.height;
+
+        // converte para pixels
+        int x1 = Mathf.RoundToInt(u1 * w);
+        int x2 = Mathf.RoundToInt(u2 * w);
+        int y1 = Mathf.RoundToInt(v1 * h);
+        int y2 = Mathf.RoundToInt(v2 * h);
+
+        int cropW = x2 - x1;
+        int cropH = y2 - y1;
+
+        // calcula deltaU em UV space
+        float deltaU = u2 - u1;
+
+        if (deltaU <= 0.5f)
         {
-            Debug.LogError("⚠️ Nenhuma HDR Texture atribuída!");
-            return;
-        }
-
-        // Converte UV para pixels
-        int x1 = Mathf.RoundToInt(points[0].x * hdrTexture.width);
-        int y1 = Mathf.RoundToInt(points[0].y * hdrTexture.height);
-        int x2 = Mathf.RoundToInt(points[1].x * hdrTexture.width);
-        int y2 = Mathf.RoundToInt(points[1].y * hdrTexture.height);
-
-        // Ordena para garantir canto inferior/esquerdo → superior/direito
-        int minX = Mathf.Min(x1, x2);
-        int maxX = Mathf.Max(x1, x2);
-        int minY = Mathf.Min(y1, y2);
-        int maxY = Mathf.Max(y1, y2);
-
-        int w = maxX - minX;
-        int h = maxY - minY;
-
-        Texture2D readableTex = MakeReadable(hdrTexture); 
-
-        // Pega pixels da região
-        Color[] pixels = readableTex.GetPixels(minX, minY, w, h);
-
-        // Cria textura recortada
-        Texture2D cropped = new Texture2D(w, h, readableTex.format, false);
-        cropped.SetPixels(pixels);
-        cropped.Apply();
-
-        // Salva como EXR para não perder HDR
-        string path = Path.Combine(Application.dataPath, "crop.exr");
-        File.WriteAllBytes(path, cropped.EncodeToEXR(Texture2D.EXRFlags.OutputAsFloat));
-
-        Debug.Log($"✅ Crop salvo em: {path}");
-    }
-
-    private Tuple<float, float> FindFace(Vector3 dir)
-    {
-        Vector3 d = dir;
-        float absX = Mathf.Abs(d.x);
-        float absY = Mathf.Abs(d.y);
-        float absZ = Mathf.Abs(d.z);
-
-        float u = 0, v = 0;
-
-        if (absX >= absY && absX >= absZ)
-        {
-            // Eixo X domina
-            if (d.x > 0)
-            { // +X
-                currentFace = CubemapFace.PositiveX;
-                u = -d.z / absX;
-                v = -d.y / absX;
-            }
-            else
-            { // -X
-                currentFace = CubemapFace.NegativeX;
-                u = d.z / absX;
-                v = -d.y / absX;
-            }
-        }
-        else if (absY >= absX && absY >= absZ)
-        {
-            // Eixo Y domina
-            if (d.y > 0)
-            { // +Y
-                currentFace = CubemapFace.PositiveY;
-                u = d.x / absY;
-                v = d.z / absY;
-            }
-            else
-            { // -Y
-                currentFace = CubemapFace.NegativeY;
-                u = d.x / absY;
-                v = -d.z / absY;
-            }
+            // crop normal
+            Color[] pixels = hdrTex.GetPixels(x1, y1, cropW, cropH);
+            Texture2D result = new Texture2D(cropW, cropH, hdrTex.format, false);
+            result.SetPixels(pixels);
+            result.Apply();
+            return result;
         }
         else
         {
-            // Eixo Z domina
-            if (d.z > 0)
-            { // +Z
-                currentFace = CubemapFace.PositiveZ;
-                u = d.x / absZ;
-                v = -d.y / absZ;
+            // atravessa borda → dois crops
+            int leftW = x1;         // 0 → u1
+            int rightW = w - x2;    // u2 → 1
+
+            int finalW = leftW + rightW;
+            int finalH = cropH;
+
+            Texture2D result = new Texture2D(finalW, finalH, hdrTex.format, false);
+
+            // crop esquerda
+            if (leftW > 0)
+            {
+                Color[] leftPixels = hdrTex.GetPixels(0, y1, leftW, cropH);
+                result.SetPixels(0, 0, leftW, cropH, leftPixels);
             }
-            else
-            { // -Z
-                currentFace = CubemapFace.NegativeZ;
-                u = -d.x / absZ;
-                v = -d.y / absZ;
+
+            // crop direita
+            if (rightW > 0)
+            {
+                Color[] rightPixels = hdrTex.GetPixels(x2, y1, rightW, cropH);
+                result.SetPixels(leftW, 0, rightW, cropH, rightPixels);
             }
+
+            result.Apply();
+            return result;
         }
-
-        // Normaliza para [0,1]
-        u = 0.5f * (u + 1.0f);
-        v = 0.5f * (v + 1.0f);
-
-        return new Tuple<float, float>(u, v);
-    }
-
-
-    void Crop(Texture2D tex, Vector2 point1, Vector2 point2)
-    {
-        int x1 = Mathf.RoundToInt(point1.x * tex.width);
-        int y1 = Mathf.RoundToInt(point1.y * tex.height);
-        int x2 = Mathf.RoundToInt(point2.x * tex.width);
-        int y2 = Mathf.RoundToInt(point2.y * tex.height);
-
-        int minX = Mathf.Min(x1, x2);
-        int maxX = Mathf.Max(x1, x2);
-        int minY = Mathf.Min(y1, y2);
-        int maxY = Mathf.Max(y1, y2);
-
-        int w = maxX - minX;
-        int h = maxY - minY;
-
-        Color[] pixels = tex.GetPixels(minX, minY, w, h);
-        Texture2D cropped = new Texture2D(w, h, tex.format, false);
-        cropped.SetPixels(pixels);
-        cropped.Apply();
-
-        box = cropped;
-
-        string folderPath = Path.Combine(Application.dataPath, "croppeds");
-        Directory.CreateDirectory(folderPath);
-
-        int id = UnityEngine.Random.Range(0, 1000);
-
-        byte[] image = cropped.EncodeToEXR();
-        string filePath = Path.Combine(folderPath, $"cropped_{id}.exr");
-        File.WriteAllBytes(filePath, image);
-
-        description.text = "Stored points!";
-    }
-
-    IEnumerator SendToAPI(string json, string apiUrl)
-    {
-
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
-        UnityWebRequest request = new UnityWebRequest(apiUrl, "POST");
-        request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-
-        yield return request.SendWebRequest();
-
-        if (request.result == UnityWebRequest.Result.Success)
-        {
-        }
-        else
-            Debug.LogError("Erro API: " + request.error);
     }
 
     [Serializable]
@@ -292,4 +198,109 @@ public class SettingPointsController : MonoBehaviour
         public Texture2D left;
         public Texture2D right;
     }
+
+    #region 6 faces
+    // Converte um vetor direção -> UV de uma face do cubemap
+    public static void DirectionToFaceUV(Vector3 dir, out CubemapFace face, out Vector2 uv)
+    {
+        dir.Normalize();
+        float absX = Mathf.Abs(dir.x);
+        float absY = Mathf.Abs(dir.y);
+        float absZ = Mathf.Abs(dir.z);
+
+        if (absX >= absY && absX >= absZ)
+        {
+            if (dir.x > 0) { 
+                face = CubemapFace.PositiveX; 
+                uv = new Vector2(-dir.z, -dir.y) / absX; 
+            }
+            else { 
+                face = CubemapFace.NegativeX; 
+                uv = new Vector2(dir.z, -dir.y) / absX;
+            }
+        }
+        else if (absY >= absX && absY >= absZ)
+        {
+            if (dir.y > 0) { face = CubemapFace.PositiveY; uv = new Vector2(dir.x, dir.z) / absY; }
+            else { face = CubemapFace.NegativeY; uv = new Vector2(dir.x, -dir.z) / absY; }
+        }
+        else
+        {
+            if (dir.z > 0) { face = CubemapFace.PositiveZ; uv = new Vector2(dir.x, -dir.y) / absZ; }
+            else { face = CubemapFace.NegativeZ; uv = new Vector2(-dir.x, -dir.y) / absZ; }
+        }
+
+        uv = (uv + Vector2.one) * 0.5f; // normaliza para [0,1]
+    }
+
+    // Crop em uma face do cubemap
+    private static Texture2D CropFace(Cubemap cube, CubemapFace face, Vector2 uvA, Vector2 uvB)
+    {
+        int res = cube.width; // cubemap é quadrado
+        int x1 = Mathf.RoundToInt(Mathf.Min(uvA.x, uvB.x) * res);
+        int y1 = Mathf.RoundToInt(Mathf.Min(uvA.y, uvB.y) * res);
+        int x2 = Mathf.RoundToInt(Mathf.Max(uvA.x, uvB.x) * res);
+        int y2 = Mathf.RoundToInt(Mathf.Max(uvA.y, uvB.y) * res);
+
+        int w = x2 - x1;
+        int h = y2 - y1;
+
+        Color[] pixels = cube.GetPixels(face);
+        Texture2D faceTex = new Texture2D(res, res, TextureFormat.RGBA32, false);
+        faceTex.SetPixels(pixels);
+        faceTex.Apply();
+
+        Color[] crop = faceTex.GetPixels(x1, y1, w, h);
+        Texture2D result = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        result.SetPixels(crop);
+        result.Apply();
+
+        return result;
+    }
+
+    // Função principal
+    public Texture2D CropBoxFromDirections(Cubemap cube, Vector3 dirA, Vector3 dirB)
+    {
+        DirectionToFaceUV(dirA, out CubemapFace faceA, out Vector2 uvA);
+        DirectionToFaceUV(dirB, out CubemapFace faceB, out Vector2 uvB);
+
+        if (faceA == faceB)
+        {
+            // Ambos pontos na mesma face → crop direto
+            Texture2D cropA = CropFace(cube, faceA, uvA, uvB);
+            currentFaces.Add(faceA);
+            coords.Add(uvA);
+            coords.Add(uvB);
+            return SkyBoxController.Instance.FlipTextureY(cropA);
+        }
+        else
+        {
+            // Estão em faces diferentes → precisa de duas texturas
+            Texture2D cropA = CropFace(cube, faceA, uvA, new Vector2(1, 1));
+            Texture2D cropB = CropFace(cube, faceB, new Vector2(0, 0), uvB);
+
+            // Corrige a inversão vertical
+            Texture2D cropAInverted = SkyBoxController.Instance.FlipTextureY(cropA);
+            Texture2D cropBInverted = SkyBoxController.Instance.FlipTextureY(cropB);
+
+            currentFaces.Add(faceA);
+            currentFaces.Add(faceB);
+            coords.Add(uvA);
+            coords.Add(new Vector2(1, 1));
+            coords.Add(new Vector2(0, 0));
+            coords.Add(uvB);
+
+            // Une as duas imagens horizontalmente
+            int finalW = cropAInverted.width + cropBInverted.width;
+            int finalH = Mathf.Max(cropAInverted.height, cropBInverted.height);
+            Texture2D result = new Texture2D(finalW, finalH, TextureFormat.RGBA32, false);
+
+            result.SetPixels(0, 0, cropAInverted.width, cropAInverted.height, cropAInverted.GetPixels());
+            result.SetPixels(cropAInverted.width, 0, cropBInverted.width, cropBInverted.height, cropBInverted.GetPixels());
+            result.Apply();
+
+            return result;
+        }
+    }
+    #endregion
 }

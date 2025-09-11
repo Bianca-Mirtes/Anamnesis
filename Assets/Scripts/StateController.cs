@@ -12,10 +12,18 @@ public class StateController : MonoBehaviour
         Instance = this;
     }
 
+    private void Start()
+    {
+        GameController.Instance.ChangeState(State.ChooseWay);
+    }
+
     public void SetState(State state)
     {
         lastState = stateNow;
         stateNow = state;
+
+        Debug.Log("Estado anterior: " + lastState);
+        Debug.Log("Estado atual: " + stateNow);
     }
 
     public State GetState() { return stateNow; }

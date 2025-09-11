@@ -9,6 +9,8 @@ public class OptionsController : MonoBehaviour
     [SerializeField] private Button getdbBtn;
     [SerializeField] private Button returnBtn;
 
+    private bool stateChanged = false;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -20,23 +22,53 @@ public class OptionsController : MonoBehaviour
     }
 
     private void AddObject() {
-        StateController.Instance.SetState(State.Recording);
+        if (!stateChanged)
+        {
+            FuncionalityController.Instance.SetFuncionality(Funcionality.ADD);
+            GameController.Instance.ChangeState(State.Recording);
+            stateChanged = true;
+            Invoke("ResetChoice", 3f);
+        }
     }
     private void RemoveObject() {
-        StateController.Instance.SetState(State.SettingPoints);
+        if (!stateChanged)
+        {
+            FuncionalityController.Instance.SetFuncionality(Funcionality.REMOVE);
+            GameController.Instance.ChangeState(State.SettingPoints);
+            stateChanged = true;
+            Invoke("ResetChoice", 3f);
+        }
     }
 
     private void CloneObject() {
-        StateController.Instance.SetState(State.SettingPoints);
+        if (!stateChanged)
+        {
+            FuncionalityController.Instance.SetFuncionality(Funcionality.CLONE);
+            GameController.Instance.ChangeState(State.SettingPoints);
+            stateChanged = true;
+            Invoke("ResetChoice", 3f);
+        }
     }
 
     private void GetOfTheDatabase() {
-        StateController.Instance.SetState(State.ConsultingInventory);
+        if (!stateChanged)
+        {
+            FuncionalityController.Instance.SetFuncionality(Funcionality.INVENTORY);
+            GameController.Instance.ChangeState(State.ConsultingInventory);
+            stateChanged = true;
+            Invoke("ResetChoice", 3f);
+        }
     }
 
     private void ReturnStep()
     {
-        StateController.Instance.SetState(StateController.Instance.GetLastState());
+        GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        SkyBoxController.Instance.ResetExp();
+    }
+
+    private void ResetChoice()
+    {
+        stateChanged = false;
     }
 
 }
