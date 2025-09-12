@@ -36,11 +36,12 @@ public class InventoryController : MonoBehaviour
     {
         GameController.Instance.ChangeState(StateController.Instance.GetLastState());
         FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
+        FindFirstObjectByType<ObjectManipulationController>().DisableCanvas();
 
-        for (int ii = 0; ii < ObjectStorage.transform.childCount; ii++)
+        /*for (int ii = 0; ii < ObjectStorage.transform.childCount; ii++)
         {
             Destroy(ObjectStorage.transform.GetChild(ii).gameObject);
-        }
+        }*/
     }
 
     public async void AddObject(string image_base64, string glb_base64)
@@ -121,8 +122,9 @@ public class InventoryController : MonoBehaviour
         if (!wasSpawned)
         {
             GameObject model3D = Instantiate(model, ObjectStorage.transform);
-            currentObj = model3D;
             model3D.transform.localPosition = Vector3.zero;
+            currentObj = model3D;
+            FindFirstObjectByType<ObjectManipulationController>().SetObject(currentObj);
             wasSpawned = true;
             Invoke("ResetSpawn", 3f);
         }

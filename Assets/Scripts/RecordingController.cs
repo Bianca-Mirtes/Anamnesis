@@ -157,18 +157,22 @@ public class RecordingController : MonoBehaviour
 
     private void ReturnStep()
     {
-        if(StateController.Instance.GetLastState() == State.SettingPoints)
+        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
+        {
+            FindFirstObjectByType<ObjectManipulationController>().DisableCanvas();
+        }
+        wasVisualize = false;
+        ResetSend();
+        description.text = "Press Y to start recording...";
+
+        if (StateController.Instance.GetLastState() == State.SettingPoints)
             GameController.Instance.ChangeState(State.ChooseOptions);
         else
             GameController.Instance.ChangeState(StateController.Instance.GetLastState());
 
         FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
 
-        wasVisualize = false;
-        ResetSend();
-        description.text = "Press Y to start recording...";
-
-        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
+        /*if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
         {
             Transform trans = FindFirstObjectByType<InventoryController>().GetStorage().transform;
             for (int ii = 0; ii < trans.childCount; ii++)
@@ -176,7 +180,7 @@ public class RecordingController : MonoBehaviour
                 Destroy(trans.GetChild(ii).gameObject);
             }
             FindFirstObjectByType<ObjectManipulationController>().DisableCanvas();
-        }
+        }*/
     }
 
     private void SendAudio()
