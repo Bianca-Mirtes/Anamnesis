@@ -345,6 +345,9 @@ public class RecordingController : MonoBehaviour
                 string json = JsonUtility.ToJson(payload);
 
                 string url = $"{baseUrl}/clone_3d_64";
+
+                // envia para API
+                StartCoroutine(SendToAPI(json, url));
             }
             wasSend = true;
         }
