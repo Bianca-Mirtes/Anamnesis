@@ -125,6 +125,7 @@ public class InventoryController : MonoBehaviour
             model3D.transform.localPosition = Vector3.zero;
             currentObj = model3D;
             FindFirstObjectByType<ObjectManipulationController>().SetObject(currentObj);
+            FindFirstObjectByType<ObjectManipulationController>().EnableCanvas();
             wasSpawned = true;
             Invoke("ResetSpawn", 3f);
         }
