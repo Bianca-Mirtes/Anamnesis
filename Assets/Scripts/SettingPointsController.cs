@@ -15,10 +15,10 @@ public class SettingPointsController : MonoBehaviour
 {
     public XRRayInteractor rayInteractor; // arraste seu Ray Interactor aqui
 
-    private List<CubemapFace> currentFaces;
+    private List<CubemapFace> currentFaces = new List<CubemapFace>();
     private Cubemap currentCubemap;
     private Texture2D result;
-    private List<Vector2> coords;
+    private List<Vector2> coords = new List<Vector2>();
 
     public Texture2D hdrTexture;
     [SerializeField] private TextMeshProUGUI description;
@@ -37,7 +37,7 @@ public class SettingPointsController : MonoBehaviour
         currentCubemap = cub;
     }
 
-    public List<CubemapFace> GetCurrentFace()
+    public List<CubemapFace> GetCurrentFaces()
     {
         return currentFaces;
     }
@@ -57,22 +57,31 @@ public class SettingPointsController : MonoBehaviour
 
     private void Start()
     {
-        sendBtn.onClick.AddListener(() => GameController.Instance.ChangeState(State.Recording));
+        description.text = "Press X to set the points...";
+        sendBtn.onClick.AddListener(() => {
+            GameController.Instance.ChangeState(State.Recording);
+            rayInteractor.gameObject.SetActive(false);
+            description.text = "Press X to set the points...";
+        });
         backBtn.onClick.AddListener(ReturnStep);
     }
 
     private void ReturnStep()
     {
         GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        rayInteractor.gameObject.SetActive(false);
         FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
+        description.text = "Press X to set the points...";
     }
 
     // Update is called once per frame
     void Update()
     {
         if (StateController.Instance.GetState() == State.SettingPoints) 
-        { 
-            if (Input.GetKeyDown(KeyCode.Space)) // aqui use o input VR do seu controle
+        {
+            rayInteractor.gameObject.SetActive(true);
+#if UNITY_EDITOR
+            if (Input.GetKeyDown(KeyCode.Space))   
             {
                 description.text = $"Setting the point {pointIndex + 1}...";
                 Debug.Log($"Setting the point {pointIndex + 1}...");
@@ -98,9 +107,47 @@ public class SettingPointsController : MonoBehaviour
                     File.WriteAllBytes(filePath, image);
 
                     description.text = " 2 pontod set!";
+                    rayInteractor.gameObject.SetActive(false);
                     pointIndex = 0; // resetar para capturar novamente
                 }
             }
+#else
+            InputDeviceCharacteristics leftHandCharacteristics = InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller;
+            InputDevices.GetDevicesWithCharacteristics(leftHandCharacteristics, devices);
+            devices[0].TryGetFeatureValue(CommonUsages.primaryButton, out bool isPressed);
+
+            if(isPressed)
+            {
+                rayInteractor.gameObject.SetActive(true);
+                description.text = $"Setting the point {pointIndex + 1}...";
+                Debug.Log($"Setting the point {pointIndex + 1}...");
+                // Pega a direção do raio
+                Vector3 dir = rayInteractor.rayOriginTransform.forward.normalized;
+
+                directions[pointIndex] = dir;
+
+                pointIndex++;
+
+                // Se já tiver 2 pontos, faz o crop
+                if (pointIndex >= 2)
+                {
+                    result = CropBoxFromDirections(currentCubemap, directions[0], directions[1]);
+
+                    string folderPath = Path.Combine(Application.dataPath, "croppeds");
+                    Directory.CreateDirectory(folderPath);
+
+                    int id = UnityEngine.Random.Range(0, 1000);
+
+                    byte[] image = result.EncodeToPNG();
+                    string filePath = Path.Combine(folderPath, $"cropped_{id}.png");
+                    File.WriteAllBytes(filePath, image);
+
+                    description.text = " 2 pontod set!";
+                    rayInteractor.gameObject.SetActive(false);
+                    pointIndex = 0; // resetar para capturar novamente
+                }
+            }
+#endif
         }
     }
 
@@ -271,6 +318,8 @@ public class SettingPointsController : MonoBehaviour
             currentFaces.Add(faceA);
             coords.Add(uvA);
             coords.Add(uvB);
+            Debug.Log($"coord 1 - {faceA}: " + uvA);
+            Debug.Log($"coord 2 - {faceA}: " + uvB);
             return SkyBoxController.Instance.FlipTextureY(cropA);
         }
         else
@@ -286,9 +335,10 @@ public class SettingPointsController : MonoBehaviour
             currentFaces.Add(faceA);
             currentFaces.Add(faceB);
             coords.Add(uvA);
-            coords.Add(new Vector2(1, 1));
-            coords.Add(new Vector2(0, 0));
             coords.Add(uvB);
+
+            Debug.Log($"coord {faceA}: " + uvA);
+            Debug.Log($"coord {faceB}: " + uvB);
 
             // Une as duas imagens horizontalmente
             int finalW = cropAInverted.width + cropBInverted.width;

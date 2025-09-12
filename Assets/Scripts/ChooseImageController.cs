@@ -38,7 +38,7 @@ public class ChooseImageController : MonoBehaviour
 
         currentCategory = categories[0];
         categoryText.text = currentCategory.name;
-        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.images[currentIndex];
+        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.world[currentIndex].image;
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
 
         int count = card.transform.GetChild(1).childCount;
@@ -57,7 +57,7 @@ public class ChooseImageController : MonoBehaviour
 
         currentIndex = 0;
         categoryText.text = currentCategory.name;
-        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.images[currentIndex];
+        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.world[currentIndex].image;
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
         card.transform.GetChild(1).GetChild(1).GetChild(0).gameObject.SetActive(false);
         card.transform.GetChild(1).GetChild(2).GetChild(0).gameObject.SetActive(false);
@@ -73,7 +73,7 @@ public class ChooseImageController : MonoBehaviour
 
         currentIndex = 0;
         categoryText.text = currentCategory.name;
-        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.images[currentIndex];
+        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.world[currentIndex].image;
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
         card.transform.GetChild(1).GetChild(1).GetChild(0).gameObject.SetActive(false);
         card.transform.GetChild(1).GetChild(2).GetChild(0).gameObject.SetActive(false);
@@ -83,9 +83,9 @@ public class ChooseImageController : MonoBehaviour
     {
         currentIndex++;
 
-        if (currentIndex >= currentCategory.images.Length)
-            currentIndex = currentCategory.images.Length-1;
-        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.images[currentIndex];
+        if (currentIndex >= currentCategory.world.Length)
+            currentIndex = currentCategory.world.Length-1;
+        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.world[currentIndex].image;
 
         card.transform.GetChild(1).GetChild(currentIndex-1).GetChild(0).gameObject.SetActive(false);
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
@@ -98,7 +98,7 @@ public class ChooseImageController : MonoBehaviour
         if (currentIndex < 0)
             currentIndex = 0;
 
-        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.images[currentIndex];
+        card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.world[currentIndex].image;
 
         card.transform.GetChild(1).GetChild(currentIndex + 1).GetChild(0).gameObject.SetActive(false);
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
@@ -114,14 +114,19 @@ public class ChooseImageController : MonoBehaviour
         if (!stateChanged)
         {
             images64base = new string[6];
-            for(int ii=0; ii < currentCategory.faces.Length; ii++)
+            for(int ii=0; ii < currentCategory.world[currentIndex].faces.Length; ii++)
             {
-                byte[] textureBytes = currentCategory.faces[ii].EncodeToPNG();
+                byte[] textureBytes = currentCategory.world[currentIndex].faces[ii].EncodeToPNG();
                 // converte para Base64
                 string base64Image = Convert.ToBase64String(textureBytes);
                 images64base[ii] = base64Image;
             }
 
+            int randomN = UnityEngine.Random.Range(0, 1000);
+            string id = currentCategory.world[currentIndex].id + "" + randomN;
+
+            GameController.Instance.session_id = int.Parse(id);
+            Debug.Log(id);
             Cubemap result = SkyBoxController.Instance.BuildCubemap(images64base);
             SkyBoxController.Instance.ApplyCubemap(result);
             GameController.Instance.ChangeState(State.ChooseOptions); 

@@ -63,6 +63,7 @@ public class OptionsController : MonoBehaviour
     private void ReturnStep()
     {
         GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
         SkyBoxController.Instance.ResetExp();
     }
 

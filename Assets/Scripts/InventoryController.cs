@@ -1,20 +1,25 @@
+using GLTFast;
+using GLTFast.Schema;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
-using GLTFast;
-using System.Threading.Tasks;
+using Image = UnityEngine.UI.Image;
 
 public class InventoryController : MonoBehaviour
 {
     [SerializeField] private Button returnBtn;
     [SerializeField] private Transform content;
     [SerializeField] private GameObject prefab;
+    [SerializeField] private GameObject ObjectStorage;
+    private GameObject currentObj = null;
+    private bool wasSpawned = false;
 
-    private Dictionary<Sprite, GameObject> objects;
+    private Dictionary<Sprite, (GameObject, GameObject)> objects = new Dictionary<Sprite, (GameObject, GameObject)>();
     private int count=0;
 
     void Start()
@@ -22,10 +27,20 @@ public class InventoryController : MonoBehaviour
         returnBtn.onClick.AddListener(ReturnStep);
     }
 
+    public GameObject GetStorage()
+    {
+        return ObjectStorage;
+    }
+
     private void ReturnStep()
     {
         GameController.Instance.ChangeState(StateController.Instance.GetLastState());
         FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
+
+        for (int ii = 0; ii < ObjectStorage.transform.childCount; ii++)
+        {
+            Destroy(ObjectStorage.transform.GetChild(ii).gameObject);
+        }
     }
 
     public async void AddObject(string image_base64, string glb_base64)
@@ -56,8 +71,15 @@ public class InventoryController : MonoBehaviour
 
         GameObject obj = Instantiate(prefab, content);
         obj.GetComponent<Image>().sprite = sprite;
+        (GameObject, GameObject) pair;
+        pair.Item1 = obj;
+        pair.Item2 = currentObj;
 
-        objects.Add(sprite, obj);
+        obj.GetComponent<Button>().onClick.AddListener(() => OnClick(pair.Item2));
+        objects.Add(sprite, pair);
+
+        FindFirstObjectByType<ObjectManipulationController>().SetObject(currentObj);
+        FindFirstObjectByType<ObjectManipulationController>().EnableCanvas();
     }
 
     /// <summary>
@@ -75,22 +97,34 @@ public class InventoryController : MonoBehaviour
             return;
         }
 
-        bool instantiated = await gltf.InstantiateMainSceneAsync(GameController.Instance.ObjectStorage.transform);
+        var root = new GameObject("GLB_Root");
+        root.tag = "Model3D";
+
+        bool instantiated = await gltf.InstantiateMainSceneAsync(root.transform);
         if (!instantiated)
         {
             Debug.LogError("[GlbSpawnFromBase64] Falha ao instanciar cena principal do GLB.");
             return;
         }
+        currentObj = root;
+        root.transform.parent = ObjectStorage.transform;
+        root.transform.localPosition = Vector3.zero;
+    }
+
+    private void ResetSpawn()
+    {
+        wasSpawned = false;
     }
 
     private void OnClick(GameObject model)
     {
-        Instantiate(model, content);
-    }
-
-    [System.Serializable]
-    public class ZipResponse
-    {
-        public string zipFileBase64;
+        if (!wasSpawned)
+        {
+            GameObject model3D = Instantiate(model, ObjectStorage.transform);
+            currentObj = model3D;
+            model3D.transform.localPosition = Vector3.zero;
+            wasSpawned = true;
+            Invoke("ResetSpawn", 3f);
+        }
     }
 }

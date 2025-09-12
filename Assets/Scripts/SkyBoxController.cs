@@ -99,12 +99,6 @@ public class SkyBoxController : MonoBehaviour
                 // Corrige a inversão vertical
                 tex = FlipTextureY(tex);
 
-                if (i == 4)
-                    tex = RotateTexture(tex);
-
-                if (i == 5)
-                    tex = RotateTexture(tex, false);
-
                 // Copia pixels da textura para a face do cubemap
                 Color[] pixels = tex.GetPixels();
                 cubemap.SetPixels(pixels, faces[i]);
@@ -114,7 +108,7 @@ public class SkyBoxController : MonoBehaviour
             for (int i = 0; i < imagesBase64.Length && i < 6; i++)
             {
                 byte[] imgBytes;
-                for (int jj = 0; jj < faces.Length; jj++)
+                for (int jj = 0; jj < face.Count; jj++)
                 {
                     if (face[jj] == faces[i])
                         imgBytes = Convert.FromBase64String(newImage[jj]);
@@ -126,12 +120,6 @@ public class SkyBoxController : MonoBehaviour
 
                     // Corrige a inversão vertical
                     tex = FlipTextureY(tex);
-
-                    if (i == 4)
-                        tex = RotateTexture(tex);
-
-                    if (i == 5)
-                        tex = RotateTexture(tex, false);
 
                     // Copia pixels da textura para a face do cubemap
                     Color[] pixels = tex.GetPixels();
@@ -206,4 +194,8 @@ public class SkyBoxController : MonoBehaviour
         DynamicGI.UpdateEnvironment(); // atualiza iluminação global
     }
 
+    private void OnApplicationQuit()
+    {
+        ResetExp();
+    }
 }

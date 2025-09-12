@@ -13,12 +13,22 @@ MonoBehaviour:
   m_Name: museum
   m_EditorClassIdentifier: 
   name: Inside a Museum
-  images:
-  - {fileID: 21300000, guid: fbe425a58065b7340a758bcfd5fe5e7a, type: 3}
-  faces:
-  - {fileID: 2800000, guid: 36a4076345756ae4e98b4049a6fae838, type: 3}
-  - {fileID: 2800000, guid: 9927f9a55564664418669b942eb745ce, type: 3}
-  - {fileID: 2800000, guid: 3a1345655a4f99e4eabfdf76547c4c88, type: 3}
-  - {fileID: 2800000, guid: 92c8b5c3ee6ad014c92f403ab9b7717b, type: 3}
-  - {fileID: 2800000, guid: 694f90482f169b644bdf6b51ac92bfad, type: 3}
-  - {fileID: 2800000, guid: 92cfdc08191d9d84c8d94776bb5f8135, type: 3}
+  world:
+  - image: {fileID: 21300000, guid: 7f9bc1a19c4c2cd4789e7f2601109978, type: 3}
+    id: 300000
+    faces:
+    - {fileID: 2800000, guid: 36a4076345756ae4e98b4049a6fae838, type: 3}
+    - {fileID: 2800000, guid: 9927f9a55564664418669b942eb745ce, type: 3}
+    - {fileID: 2800000, guid: 3a1345655a4f99e4eabfdf76547c4c88, type: 3}
+    - {fileID: 2800000, guid: 92c8b5c3ee6ad014c92f403ab9b7717b, type: 3}
+    - {fileID: 2800000, guid: 694f90482f169b644bdf6b51ac92bfad, type: 3}
+    - {fileID: 2800000, guid: 92cfdc08191d9d84c8d94776bb5f8135, type: 3}
+  - image: {fileID: 21300000, guid: 244626bf115e17147aac3ee4dd516a4b, type: 3}
+    id: 400000
+    faces:
+    - {fileID: 2800000, guid: cd2db24d08bfe59499d8bc4313003bd9, type: 3}
+    - {fileID: 2800000, guid: bdf62053e4252394cb19ab08fadfc932, type: 3}
+    - {fileID: 2800000, guid: 2cca82cdb4500ec4e8977b2fafe9e942, type: 3}
+    - {fileID: 2800000, guid: 31451105210441d4ca7420c61e1b314d, type: 3}
+    - {fileID: 2800000, guid: 5b95d1b95e3771f4fa35a8ad695d0144, type: 3}
+    - {fileID: 2800000, guid: d141d7bf650db3c44a53dcea26d5d2e6, type: 3}

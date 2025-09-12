@@ -65,6 +65,7 @@ public class ChooseWayController : MonoBehaviour
         if (currentIndex == 0)
         {
             FuncionalityController.Instance.SetFuncionality(Funcionality.WORLD_GENERATION);
+            GameController.Instance.session_id = Random.Range(0, 1000);
             GameController.Instance.ChangeState(State.Recording);
             GameController.Instance.currentWay = 0;
         }

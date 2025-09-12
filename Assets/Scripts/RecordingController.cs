@@ -1,8 +1,10 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using TMPro;
 using Unity.Mathematics;
@@ -30,13 +32,17 @@ public class RecordingController : MonoBehaviour
     [SerializeField] private GameObject objectC;
 
     private Cubemap result;
-    private Dictionary<FaceName, string> facesGenerated;
+    private string face1Generated = "";
+    private string face2Generated = "";
+    private string image1_generated = "";
+    private string image2_generated = "";
 
     private string imageObj_base64 = "";
     private string obj_base64 = "";
 
     private static RecordingController _instance;
     private bool wasSend = false;
+    private bool wasVisualize = false;
 
     // Singleton
     public static RecordingController Instance
@@ -76,7 +82,17 @@ public class RecordingController : MonoBehaviour
     {
         if (StateController.Instance.GetState() == State.Recording)
         {
-            /*InputDeviceCharacteristics leftHandCharacteristics = InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller;
+#if UNITY_EDITOR
+            if (Input.GetKeyDown(KeyCode.L) && !isRecording)
+            {
+                StartRecording();
+            }
+            if (Input.GetKeyUp(KeyCode.L) && isRecording)
+            {
+                Stop();
+            }
+#else
+            InputDeviceCharacteristics leftHandCharacteristics = InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller;
             InputDevices.GetDevicesWithCharacteristics(leftHandCharacteristics, devices);
             devices[0].TryGetFeatureValue(CommonUsages.secondaryButton, out bool isPressed);
 
@@ -86,19 +102,11 @@ public class RecordingController : MonoBehaviour
             }
             if(!isPressed && lastPressed && isRecording)
             {
-                StopAndSave();
-            }
-
-            lastPressed = isPressed;*/
-
-            if (Input.GetKeyDown(KeyCode.L) && !isRecording)
-            {
-                StartRecording();
-            }
-            if (Input.GetKeyUp(KeyCode.L) && isRecording)
-            {
                 Stop();
             }
+
+            lastPressed = isPressed;
+#endif
         }
     }
 
@@ -149,8 +157,26 @@ public class RecordingController : MonoBehaviour
 
     private void ReturnStep()
     {
-        GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        if(StateController.Instance.GetLastState() == State.SettingPoints)
+            GameController.Instance.ChangeState(State.ChooseOptions);
+        else
+            GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+
         FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
+
+        wasVisualize = false;
+        ResetSend();
+        description.text = "Press Y to start recording...";
+
+        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
+        {
+            Transform trans = FindFirstObjectByType<InventoryController>().GetStorage().transform;
+            for (int ii = 0; ii < trans.childCount; ii++)
+            {
+                Destroy(trans.GetChild(ii).gameObject);
+            }
+            FindFirstObjectByType<ObjectManipulationController>().DisableCanvas();
+        }
     }
 
     private void SendAudio()
@@ -166,7 +192,6 @@ public class RecordingController : MonoBehaviour
             // converte para Base64
             string base64Audio = Convert.ToBase64String(wavData);
 
-            GameController.Instance.session_id = UnityEngine.Random.Range(0, 1000);
             if(FuncionalityController.Instance.GetFuncionality() == Funcionality.WORLD_GENERATION)
             {
                 PayloadAudioGeneration payload = new PayloadAudioGeneration { audio_base64 = base64Audio, session_id = GameController.Instance.session_id };
@@ -190,104 +215,109 @@ public class RecordingController : MonoBehaviour
                 StartCoroutine(SendToAPI(json, url));
             }else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
             {
-                string base64Image = FindFirstObjectByType<SettingPointsController>().GetImageInBase64(); 
+                string base64Image = FindFirstObjectByType<SettingPointsController>().GetImageInBase64();
                 List<PointFacePair> payload_frag = new List<PointFacePair>();
                 List<Vector2> coords = FindFirstObjectByType<SettingPointsController>().GetCoords();
-                if (coords.Count == 2)
+                if (FindFirstObjectByType<SettingPointsController>().GetCurrentFaces().Count  == 1)
                 {
                     PointFacePair pair = new PointFacePair();
-                    pair.point[0] = new Point(coords[0].x, coords[0].y);
-                    pair.point[1] = new Point(coords[1].x, coords[1].y);
+                    pair.point = new Point(coords[0].x, coords[0].y);
 
-                    CubemapFace currentFa = FindFirstObjectByType<SettingPointsController>().GetCurrentFace()[0];
+                    PointFacePair pair2 = new PointFacePair();
+                    pair2.point = new Point(coords[1].x, coords[1].y);
+
+                    CubemapFace currentFa = FindFirstObjectByType<SettingPointsController>().GetCurrentFaces()[0];
 
                     if (currentFa == CubemapFace.NegativeX)
                     {
-                        pair.faceName = FaceName.LEFT;
+                        pair.faceName = "left";
                     }
                     if (currentFa == CubemapFace.PositiveX)
                     {
-                        pair.faceName = FaceName.RIGTH;
+                        pair.faceName = "right";
                     }
                     if (currentFa == CubemapFace.PositiveZ)
                     {
-                        pair.faceName = FaceName.FRONT;
+                        pair.faceName = "front";
                     }
                     if (currentFa == CubemapFace.PositiveY)
                     {
-                        pair.faceName = FaceName.UP;
+                        pair.faceName = "up";
                     }
                     if (currentFa == CubemapFace.NegativeY)
                     {
-                        pair.faceName = FaceName.DOWN;
+                        pair.faceName = "down";
                     }
                     if (currentFa == CubemapFace.NegativeZ)
                     {
-                        pair.faceName = FaceName.BACK;
+                        pair.faceName = "back";
                     }
+
+                    pair2.faceName = pair.faceName;
                     payload_frag.Add(pair);
+                    payload_frag.Add(pair2);
                 }
                 else
                 {
                     PointFacePair pair1 = new PointFacePair();
-                    pair1.point[0] = new Point(coords[0].x, coords[0].y);
-                    pair1.point[1] = new Point(coords[1].x, coords[1].y);
+                    pair1.point = new Point(coords[0].x, coords[0].y);
 
-                    List<CubemapFace> currentFa = FindFirstObjectByType<SettingPointsController>().GetCurrentFace();
+                    PointFacePair pair2 = new PointFacePair();
+                    pair2.point = new Point(coords[1].x, coords[1].y);
+
+                    List<CubemapFace> currentFa = FindFirstObjectByType<SettingPointsController>().GetCurrentFaces();
 
                     if (currentFa[0] == CubemapFace.NegativeX)
                     {
-                        pair1.faceName = FaceName.LEFT;
+                        pair1.faceName = "left";
                     }
                     if (currentFa[0] == CubemapFace.PositiveX)
                     {
-                        pair1.faceName = FaceName.RIGTH;
+                        pair1.faceName =  "right";
                     }
                     if (currentFa[0] == CubemapFace.PositiveZ)
                     {
-                        pair1.faceName = FaceName.FRONT;
+                        pair1.faceName = "front";
                     }
                     if (currentFa[0] == CubemapFace.PositiveY)
                     {
-                        pair1.faceName = FaceName.UP;
+                        pair1.faceName = "up";
                     }
                     if (currentFa[0] == CubemapFace.NegativeY)
                     {
-                        pair1.faceName = FaceName.DOWN;
+                        pair1.faceName = "down";
                     }
                     if (currentFa[0] == CubemapFace.NegativeZ)
                     {
-                        pair1.faceName = FaceName.BACK;
+                        pair1.faceName = "back";
                     }
-
-                    PointFacePair pair2 = new PointFacePair();
-                    pair2.point[0] = new Point(coords[2].x, coords[2].y);
-                    pair2.point[1] = new Point(coords[3].x, coords[3].y);
 
                     if (currentFa[1] == CubemapFace.NegativeX)
                     {
-                        pair1.faceName = FaceName.LEFT;
+                        pair2.faceName = "left";
                     }
                     if (currentFa[1] == CubemapFace.PositiveX)
                     {
-                        pair1.faceName = FaceName.RIGTH;
+                        pair2.faceName = "right";
                     }
                     if (currentFa[1] == CubemapFace.PositiveZ)
                     {
-                        pair1.faceName = FaceName.FRONT;
+                        pair2.faceName = "front";
                     }
                     if (currentFa[1] == CubemapFace.PositiveY)
                     {
-                        pair1.faceName = FaceName.UP;
+                        pair2.faceName = "up";
                     }
                     if (currentFa[1] == CubemapFace.NegativeY)
                     {
-                        pair1.faceName = FaceName.DOWN;
+                        pair2.faceName = "down";
                     }
                     if (currentFa[1] == CubemapFace.NegativeZ)
                     {
-                        pair1.faceName = FaceName.BACK;
+                        pair2.faceName = "back";
                     }
+                    payload_frag.Add(pair1);
+                    payload_frag.Add(pair2);
                 }
 
                 PayloadRemove payload = new PayloadRemove { image_base64 = base64Image, 
@@ -299,7 +329,7 @@ public class RecordingController : MonoBehaviour
                 // 4) Serializa para JSON
                 string json = JsonUtility.ToJson(payload);
 
-                string url = $"{baseUrl}/process_image";
+                string url = $"{baseUrl}/process_image_full";
                 // envia para API
                 StartCoroutine(SendToAPI(json, url));
             }
@@ -310,10 +340,9 @@ public class RecordingController : MonoBehaviour
                 // 4) Serializa para JSON
                 string json = JsonUtility.ToJson(payload);
 
-                string url = $"{baseUrl}/clone_3d";
+                string url = $"{baseUrl}/clone_3d_64";
             }
             wasSend = true;
-            Invoke("ResetSend", 5f);
         }
     }
 
@@ -368,156 +397,207 @@ public class RecordingController : MonoBehaviour
         spinner.SetActive(true);
 
         byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
-        UnityWebRequest request = new UnityWebRequest(apiUrl, "POST");
-        request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-
-        yield return request.SendWebRequest();
-
-        if (request.result == UnityWebRequest.Result.Success)
+        using (UnityWebRequest request = new UnityWebRequest(apiUrl, "POST"))
         {
-            if (FuncionalityController.Instance.GetFuncionality() == Funcionality.WORLD_GENERATION)
-            {
-                Debug.Log("Resposta: " + request.downloadHandler.text);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
 
-                // Aqui você pode deserializar o JSON de volta para um objeto
-                CubemapResponse response = JsonUtility.FromJson<CubemapResponse>(request.downloadHandler.text);
+            yield return request.SendWebRequest();
 
-                Debug.Log("Status: " + response.status);
-                Debug.Log("Message: " + response.message);
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                if (FuncionalityController.Instance.GetFuncionality() == Funcionality.WORLD_GENERATION)
+                {
+                    Debug.Log("Resposta: " + request.downloadHandler.text);
 
-                result = SkyBoxController.Instance.BuildCubemap(response.cubemap_images);
-                spinner.SetActive(false);
-                description.text = "World generated!";
+                    // Aqui você pode deserializar o JSON de volta para um objeto
+                    CubemapResponse response = JsonUtility.FromJson<CubemapResponse>(request.downloadHandler.text);
+
+                    Debug.Log("Status: " + response.status);
+                    Debug.Log("Message: " + response.message);
+
+                    result = SkyBoxController.Instance.BuildCubemap(response.cubemap_images);
+                    spinner.SetActive(false);
+                    description.text = "World generated!";
+                    spinner.SetActive(false);
+                }
+                else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
+                {
+                    Model3DResponse response = JsonUtility.FromJson<Model3DResponse>(request.downloadHandler.text);
+                    imageObj_base64 = response.image_base64;
+                    obj_base64 = response.glb_base64;
+                    description.text = "Object 3D generated!";
+                    spinner.SetActive(false);
+                }
+                else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
+                {
+                    ImageEditResponse response = JsonConvert.DeserializeObject<ImageEditResponse>(request.downloadHandler.text);
+                    face1Generated = response.faceName1;
+                    face2Generated = response.faceName2;
+                    image1_generated = response.faceImg1;
+                    image2_generated = response.faceImg2;
+
+                    // 4) Serializa para JSON
+                    string jsonm = JsonUtility.ToJson(response);
+
+                    Debug.Log("JSON gerado:\n" + request.downloadHandler.text);
+
+                    // Exemplo: salvar em arquivo local
+                    File.WriteAllText(Application.dataPath + "/cache.json", jsonm);
+
+                    description.text = "Object removed!";
+                    spinner.SetActive(false);
+                }
+                else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.CLONE)
+                {
+                    Clone3DResponse response = JsonConvert.DeserializeObject<Clone3DResponse>(request.downloadHandler.text);
+                    imageObj_base64 = response.image_base64;
+                    obj_base64 = response.glb_base64;
+
+                    description.text = "Clone generated!";
+                    spinner.SetActive(false);
+                }
             }
-            else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
-            {
-                Model3DResponse response = JsonUtility.FromJson<Model3DResponse>(request.downloadHandler.text);
-                imageObj_base64 = response.image_base64;
-                obj_base64 = response.glb_base64;
-                description.text = "Object 3D generated!";
-            }
-            else if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
-            {
-                ImageEditResponse response = JsonUtility.FromJson<ImageEditResponse>(request.downloadHandler.text);
-                facesGenerated = response.images_base64;
-                description.text = "Object removed!";
-            }
-            else if(FuncionalityController.Instance.GetFuncionality() == Funcionality.CLONE) {
-                Model3DResponse response = JsonUtility.FromJson<Model3DResponse>(request.downloadHandler.text);
-                imageObj_base64 = response.image_base64;
-                obj_base64 = response.glb_base64;
-                description.text = "Clone generated!";
-            }
+            else
+                Debug.LogError("Erro API: " + request.error);
         }
-        else
-            Debug.LogError("Erro API: " + request.error);
     }
 
     private void Visualize()
     {
-        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.WORLD_GENERATION)
+        if (!wasVisualize)
         {
-            if (result != null) 
-            { 
-                SkyBoxController.Instance.ApplyCubemap(result);
-                GameController.Instance.ChangeState(State.ChooseOptions);
-            }
-        }
-        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
-        {
-            if (facesGenerated != null)
+            if (FuncionalityController.Instance.GetFuncionality() == Funcionality.WORLD_GENERATION)
             {
-                List<FaceName> currentF = new List<FaceName>();
-                List<string> currentI = new List<string>();
-                List<CubemapFace> faces = new List<CubemapFace>();
-                if (facesGenerated.Count > 1)
+                if (result != null)
                 {
-                    foreach (KeyValuePair<FaceName, string> obj in facesGenerated)
+                    SkyBoxController.Instance.ApplyCubemap(result);
+                    GameController.Instance.ChangeState(State.ChooseOptions);
+                }
+            }
+            if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
+            {
+                if (face1Generated != "" && face2Generated != "")
+                {
+                    List<string> currentI = new List<string>();
+                    List<CubemapFace> faces = new List<CubemapFace>();
+                    if (!face1Generated.Equals(face2Generated))
                     {
-                        currentF.Add(obj.Key);
-                        currentI.Add(obj.Value);
-                        if (currentF[0] == FaceName.LEFT)
+                        currentI.Add(image1_generated);
+                        if (face1Generated == "left")
                         {
                             faces.Add(CubemapFace.NegativeX);
                         }
-                        if (currentF[0] == FaceName.RIGTH)
+                        if (face1Generated == "right")
                         {
                             faces.Add(CubemapFace.PositiveX);
                         }
-                        if (currentF[0] == FaceName.FRONT)
+                        if (face1Generated == "front")
                         {
                             faces.Add(CubemapFace.PositiveZ);
                         }
-                        if (currentF[0] == FaceName.UP)
+                        if (face1Generated == "up")
                         {
                             faces.Add(CubemapFace.PositiveY);
                         }
-                        if (currentF[0] == FaceName.BACK)
+                        if (face1Generated == "back")
                         {
                             faces.Add(CubemapFace.NegativeZ);
                         }
-                        if (currentF[0] == FaceName.DOWN)
+                        if (face1Generated == "down")
+                        {
+                            faces.Add(CubemapFace.NegativeY);
+                        }
+
+                        currentI.Add(image2_generated);
+                        if (face2Generated == "left")
+                        {
+                            faces.Add(CubemapFace.NegativeX);
+                        }
+                        if (face2Generated == "right")
+                        {
+                            faces.Add(CubemapFace.PositiveX);
+                        }
+                        if (face2Generated == "front")
+                        {
+                            faces.Add(CubemapFace.PositiveZ);
+                        }
+                        if (face2Generated == "up")
+                        {
+                            faces.Add(CubemapFace.PositiveY);
+                        }
+                        if (face2Generated == "back")
+                        {
+                            faces.Add(CubemapFace.NegativeZ);
+                        }
+                        if (face2Generated == "down")
                         {
                             faces.Add(CubemapFace.NegativeY);
                         }
                     }
-                } else {
-                    currentF.Add(facesGenerated.First().Key);
-                    currentI.Add(facesGenerated.First().Value);
-                    if (currentF[0] == FaceName.LEFT)
+                    else
                     {
-                        faces[0] = CubemapFace.NegativeX;
+                        currentI.Add(image1_generated);
+                        if (face1Generated == "left")
+                        {
+                            faces.Add(CubemapFace.NegativeX);
+                        }
+                        if (face1Generated == "right")
+                        {
+                            faces.Add(CubemapFace.PositiveX);
+                        }
+                        if (face1Generated == "front")
+                        {
+                            faces.Add(CubemapFace.PositiveZ);
+                        }
+                        if (face1Generated == "up")
+                        {
+                            faces.Add(CubemapFace.PositiveY);
+                        }
+                        if (face1Generated == "back")
+                        {
+                            faces.Add(CubemapFace.NegativeZ);
+                        }
+                        if (face1Generated == "down")
+                        {
+                            faces.Add(CubemapFace.NegativeY);
+                        }
                     }
-                    if (currentF[0] == FaceName.RIGTH)
-                    {
-                        faces[0] = CubemapFace.PositiveX;
-                    }
-                    if (currentF[0] == FaceName.FRONT)
-                    {
-                        faces[0] = CubemapFace.PositiveZ;
-                    }
-                    if (currentF[0] == FaceName.UP)
-                    {
-                        faces[0] = CubemapFace.PositiveY;
-                    }
-                    if (currentF[0] == FaceName.BACK)
-                    {
-                        faces[0] = CubemapFace.NegativeZ;
-                    }
-                    if (currentF[0] == FaceName.DOWN)
-                    {
-                        faces[0] = CubemapFace.NegativeY;
-                    }
+
+                    Cubemap resultado =SkyBoxController.Instance.BuildCubemap(FindFirstObjectByType<ChooseImageController>().GetCurrentFaces(), faces, currentI);
+                    SkyBoxController.Instance.ApplyCubemap(resultado);
                 }
-                SkyBoxController.Instance.BuildCubemap(FindFirstObjectByType<ChooseImageController>().GetCurrentFaces(), faces, currentI);
             }
-        }
-        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
-        {
-            if(imageObj_base64 != "" && obj_base64 != "")
-                FindFirstObjectByType<InventoryController>().AddObject(imageObj_base64, obj_base64);
-        }
-        if (FuncionalityController.Instance.GetFuncionality() == Funcionality.CLONE) {
-            if (imageObj_base64 != "" && obj_base64 != "")
-                FindFirstObjectByType<InventoryController>().AddObject(imageObj_base64, obj_base64);
+            if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
+            {
+                if (imageObj_base64 != "" && obj_base64 != "")
+                    FindFirstObjectByType<InventoryController>().AddObject(imageObj_base64, obj_base64);
+            }
+            if (FuncionalityController.Instance.GetFuncionality() == Funcionality.CLONE)
+            {
+                if (imageObj_base64 != "" && obj_base64 != "")
+                    FindFirstObjectByType<InventoryController>().AddObject(imageObj_base64, obj_base64);
+            }
+            wasVisualize = true;
         }
     }
 
     private void NewAudio()
     {
         description.text = "Press Y to start recording...";
+        wasSend = false;
+        wasVisualize = false;
     }
 
-    [System.Serializable]
+    [Serializable]
     public class PayloadAudioGeneration
     {
         public string audio_base64;
         public int session_id;
     }
 
-    [System.Serializable]
+    [Serializable]
     public class PayloadRemove
     {
         public string image_base64;
@@ -526,7 +606,7 @@ public class RecordingController : MonoBehaviour
         public List<PointFacePair> points;
     }
 
-    [System.Serializable]
+    [Serializable]
     public class Point
     {
         public float x;
@@ -538,16 +618,15 @@ public class RecordingController : MonoBehaviour
         }
     }
 
-
-    [System.Serializable]
+    [Serializable]
     public class PointFacePair
     {
-        public Point[] point = new Point[2];
-        public FaceName faceName;
+        public Point point;
+        public string faceName;
     }
 
 
-    [System.Serializable]
+    [Serializable]
     public class PayloadClone3D
     {
         public string image_base64;
@@ -555,7 +634,7 @@ public class RecordingController : MonoBehaviour
         public int session_id;
     }
 
-    [System.Serializable]
+    [Serializable]
     public class CubemapResponse
     {
         public string status;
@@ -572,20 +651,23 @@ public class RecordingController : MonoBehaviour
         public string image_base64;
     }
 
+    [System.Serializable]
+    public class Clone3DResponse
+    {
+        public string status;
+        public string message;
+        public string glb_base64;
+        public string image_base64;
+    }
+
+    [System.Serializable]
     public class ImageEditResponse
     {
         public string status;
         public string message;
-        public Dictionary<FaceName, string> images_base64; 
-    }
-
-    public enum FaceName
-    {
-        LEFT,
-        FRONT,
-        RIGTH,
-        BACK,
-        UP,
-        DOWN
+        public string faceName1;
+        public string faceName2;
+        public string faceImg1;
+        public string faceImg2;
     }
 }

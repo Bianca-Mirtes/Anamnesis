@@ -5,8 +5,6 @@ public class GameController : MonoBehaviour
     private static GameController _instance;
     public int session_id { get; set; }
 
-    public GameObject ObjectStorage;
-
     public int currentWay = -1;
     // Singleton
     public static GameController Instance
