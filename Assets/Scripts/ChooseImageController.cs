@@ -131,12 +131,17 @@ public class ChooseImageController : MonoBehaviour
             SkyBoxController.Instance.ApplyCubemap(result);
             GameController.Instance.ChangeState(State.ChooseOptions); 
             stateChanged = true;
+            Invoke("ResetSetCubemap", 3f);
         }
+    }
+    private void ResetSetCubemap()
+    {
+        stateChanged = false; 
     }
 
     private void ReturnStep()
     {
-        GameController.Instance.ChangeState(StateController.Instance.GetLastState());
+        GameController.Instance.ChangeState(State.ChooseWay);
         SkyBoxController.Instance.ResetExp();
     }
 }
