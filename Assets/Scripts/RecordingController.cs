@@ -12,6 +12,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using UnityEngine.XR;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 public class RecordingController : MonoBehaviour
 {
@@ -43,6 +44,10 @@ public class RecordingController : MonoBehaviour
     private static RecordingController _instance;
     private bool wasSend = false;
     private bool wasVisualize = false;
+    private bool isWaiting = false;
+
+    public XRRayInteractor rayInteractor1; // arraste seu Ray Interactor aqui
+    public XRRayInteractor rayInteractor2; // arraste seu Ray Interactor aqui
 
     // Singleton
     public static RecordingController Instance
@@ -64,7 +69,7 @@ public class RecordingController : MonoBehaviour
 
     void Start()
     {
-        baseUrl = "https://4dbbb1e6032f.ngrok-free.app";
+        baseUrl = "https://ab516b235bd9.ngrok-free.app";
         // Se ainda não tem a permissão, pede
         if (!Application.HasUserAuthorization(UserAuthorization.Microphone))
         {
@@ -159,7 +164,9 @@ public class RecordingController : MonoBehaviour
     {
         if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
         {
-            FindFirstObjectByType<ObjectManipulationController>().DisableCanvas();
+            FindFirstObjectByType<InventoryController>().DisableCanvas();
+            rayInteractor1.gameObject.SetActive(false);
+            rayInteractor2.gameObject.SetActive(false);
         }
         wasVisualize = false;
         ResetSend();
@@ -171,16 +178,6 @@ public class RecordingController : MonoBehaviour
             GameController.Instance.ChangeState(StateController.Instance.GetLastState());
 
         FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
-
-        /*if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
-        {
-            Transform trans = FindFirstObjectByType<InventoryController>().GetStorage().transform;
-            for (int ii = 0; ii < trans.childCount; ii++)
-            {
-                Destroy(trans.GetChild(ii).gameObject);
-            }
-            FindFirstObjectByType<ObjectManipulationController>().DisableCanvas();
-        }*/
     }
 
     private void SendAudio()
@@ -400,6 +397,7 @@ public class RecordingController : MonoBehaviour
 
     IEnumerator SendToAPI(string json, string apiUrl)
     {
+        isWaiting = true;
         description.text = "Waiting API response...";
         spinner.SetActive(true);
 
@@ -465,6 +463,7 @@ public class RecordingController : MonoBehaviour
                     description.text = "Clone generated!";
                     spinner.SetActive(false);
                 }
+                isWaiting = false;
             }
             else
                 Debug.LogError("Erro API: " + request.error);
@@ -481,6 +480,7 @@ public class RecordingController : MonoBehaviour
                 {
                     SkyBoxController.Instance.ApplyCubemap(result);
                     GameController.Instance.ChangeState(State.ChooseOptions);
+                    wasVisualize = true;
                 }
             }
             if (FuncionalityController.Instance.GetFuncionality() == Funcionality.REMOVE)
@@ -574,27 +574,38 @@ public class RecordingController : MonoBehaviour
 
                     Cubemap resultado =SkyBoxController.Instance.BuildCubemap(FindFirstObjectByType<ChooseImageController>().GetCurrentFaces(), faces, currentI);
                     SkyBoxController.Instance.ApplyCubemap(resultado);
+                    wasVisualize = true;
                 }
             }
             if (FuncionalityController.Instance.GetFuncionality() == Funcionality.ADD)
             {
                 if (imageObj_base64 != "" && obj_base64 != "")
+                {
+                    rayInteractor1.gameObject.SetActive(true);
+                    rayInteractor2.gameObject.SetActive(true);
                     FindFirstObjectByType<InventoryController>().AddObject(imageObj_base64, obj_base64);
+                    wasVisualize = true;
+                }
             }
             if (FuncionalityController.Instance.GetFuncionality() == Funcionality.CLONE)
             {
                 if (imageObj_base64 != "" && obj_base64 != "")
+                {
                     FindFirstObjectByType<InventoryController>().AddObject(imageObj_base64, obj_base64);
+                    wasVisualize = true;
+                }
             }
-            wasVisualize = true;
         }
     }
 
     private void NewAudio()
     {
-        description.text = "Press Y to start recording...";
-        wasSend = false;
-        wasVisualize = false;
+        if (!isWaiting)
+        {
+            description.text = "Press Y to start recording...";
+            wasSend = false;
+            wasVisualize = false;
+        }
     }
 
     [Serializable]

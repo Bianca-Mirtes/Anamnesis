@@ -6,7 +6,6 @@ using UnityEngine;
 public class SkyBoxController : MonoBehaviour
 {
     [SerializeField] private Material skyboxMaterial;
-    [SerializeField] private Cubemap[] cubemaps;
     [SerializeField] private Cubemap defaultCubmap;
     private static SkyBoxController _instance;
 

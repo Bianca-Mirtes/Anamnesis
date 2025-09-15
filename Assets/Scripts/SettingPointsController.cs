@@ -5,10 +5,10 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using TMPro;
-using UnityEditor.Overlays;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
+using UnityEngine.XR;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 public class SettingPointsController : MonoBehaviour
@@ -25,7 +25,18 @@ public class SettingPointsController : MonoBehaviour
     [SerializeField] private Button sendBtn;
     [SerializeField] private Button backBtn;
     private Vector3[] directions = new Vector3[2];
+    private List<GameObject> points = new List<GameObject>();
     private int pointIndex = 0;
+
+    [SerializeField] private GameObject markerPrefab;
+
+    private void MarkerInstance(Vector3 dir)
+    {
+        float radius = 10f;
+        Vector3 pos = Camera.main.transform.position + dir.normalized * radius;
+
+        points.Add(Instantiate(markerPrefab, pos, Quaternion.Euler(0f, 90f, 0f)));
+    }
 
     public void SethdrTexture(Texture2D tex)
     {
@@ -61,6 +72,8 @@ public class SettingPointsController : MonoBehaviour
         sendBtn.onClick.AddListener(() => {
             GameController.Instance.ChangeState(State.Recording);
             rayInteractor.gameObject.SetActive(false);
+            Destroy(points[0]);
+            Destroy(points[1]);
             description.text = "Press X to set the points...";
         });
         backBtn.onClick.AddListener(ReturnStep);
@@ -87,6 +100,8 @@ public class SettingPointsController : MonoBehaviour
                 Debug.Log($"Setting the point {pointIndex + 1}...");
                 // Pega a direção do raio
                 Vector3 dir = rayInteractor.rayOriginTransform.forward.normalized;
+
+                MarkerInstance(dir);
 
                 directions[pointIndex] = dir;
 

@@ -8,16 +8,24 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using Image = UnityEngine.UI.Image;
 
 public class InventoryController : MonoBehaviour
 {
     [SerializeField] private Button returnBtn;
+    [SerializeField] private Button deleteObj;
     [SerializeField] private Transform content;
     [SerializeField] private GameObject prefab;
     [SerializeField] private GameObject ObjectStorage;
+    [SerializeField] private GameObject panel;
     private GameObject currentObj = null;
     private bool wasSpawned = false;
+
+    // Objeto atualmente segurado
+    private GameObject selectedObject = null;
+
 
     private Dictionary<Sprite, (GameObject, GameObject)> objects = new Dictionary<Sprite, (GameObject, GameObject)>();
     private int count=0;
@@ -25,6 +33,7 @@ public class InventoryController : MonoBehaviour
     void Start()
     {
         returnBtn.onClick.AddListener(ReturnStep);
+        deleteObj.onClick.AddListener(DeleteSelectedObject);
     }
 
     public GameObject GetStorage()
@@ -32,16 +41,20 @@ public class InventoryController : MonoBehaviour
         return ObjectStorage;
     }
 
+    public void DisableCanvas()
+    {
+        panel.SetActive(false);
+    }
+    public void EnableCanvas()
+    {
+        panel.SetActive(true);
+    }
+
     private void ReturnStep()
     {
         GameController.Instance.ChangeState(StateController.Instance.GetLastState());
         FuncionalityController.Instance.SetFuncionality(Funcionality.NONE);
-        FindFirstObjectByType<ObjectManipulationController>().DisableCanvas();
-
-        /*for (int ii = 0; ii < ObjectStorage.transform.childCount; ii++)
-        {
-            Destroy(ObjectStorage.transform.GetChild(ii).gameObject);
-        }*/
+        DisableCanvas();
     }
 
     public async void AddObject(string image_base64, string glb_base64)
@@ -50,7 +63,7 @@ public class InventoryController : MonoBehaviour
 
         await SpawnGlbBytes(glbBytes);
 
-        // 2. Caminho de sa�da no disco
+        // 2. Caminho de sa�da no disco
         //string path = Path.Combine(Application.persistentDataPath, "modelo.glb");
 
         byte[] imgBytes = Convert.FromBase64String(image_base64);
@@ -73,14 +86,14 @@ public class InventoryController : MonoBehaviour
         GameObject obj = Instantiate(prefab, content);
         obj.GetComponent<Image>().sprite = sprite;
         (GameObject, GameObject) pair;
+
         pair.Item1 = obj;
         pair.Item2 = currentObj;
 
         obj.GetComponent<Button>().onClick.AddListener(() => OnClick(pair.Item2));
         objects.Add(sprite, pair);
 
-        FindFirstObjectByType<ObjectManipulationController>().SetObject(currentObj);
-        FindFirstObjectByType<ObjectManipulationController>().EnableCanvas();
+        EnableCanvas();
     }
 
     /// <summary>
@@ -107,9 +120,76 @@ public class InventoryController : MonoBehaviour
             Debug.LogError("[GlbSpawnFromBase64] Falha ao instanciar cena principal do GLB.");
             return;
         }
-        currentObj = root;
         root.transform.parent = ObjectStorage.transform;
         root.transform.localPosition = Vector3.zero;
+
+        // --- FIND THE MESH GAMEOBJECT (assume a single mesh)
+        var meshFilter = root.GetComponentInChildren<MeshFilter>();
+        if (meshFilter == null)
+        {
+            Debug.LogError("[GlbSpawnFromBase64] N�o foi encontrado MeshFilter no GLB instanciado.");
+            return;
+        }
+
+        var meshGO = meshFilter.gameObject;
+
+        // --- RIGIDBODY (adiciona antes de usar)
+        var rb =  meshGO.AddComponent<Rigidbody>();
+        rb.isKinematic = true;      // padr�o: n�o cair enquanto n�o agarrado
+        rb.useGravity = false;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
+        // --- MESH COLLIDER (assegura que sharedMesh est� apontando)
+        var mc = meshGO.AddComponent<MeshCollider>();
+        mc.sharedMesh = meshFilter.sharedMesh;
+        // OBS: MeshCollider.convex � necess�rio se houver Rigidbody din�mico; se seu mesh for muito complexo, pode falhar
+        mc.convex = true;
+
+        // --- XRGrabInteractable (no MESMO GameObject que o collider + rigidbody)
+        var grab = meshGO.AddComponent<XRGrabInteractable>();
+
+        // OPTIONAL: ajustar o attach transform para o centro do mesh (melhora comportamento do grab)
+        var attach = new GameObject("Attach");
+        attach.transform.SetParent(meshGO.transform, false);
+        attach.transform.localPosition = meshFilter.sharedMesh.bounds.center;
+        grab.attachTransform = attach.transform;
+
+        // --- OPTIONAL: toggling kinematic for physics-based grab
+        // Quando selecionado -> deixa n�o-kinematic (move por f�sica/velocidade)
+        grab.selectEntered.AddListener((SelectEnterEventArgs args) =>
+        {
+            rb.isKinematic = false;
+            IXRSelectInteractable interactable = args.interactableObject;
+            if (interactable != null)
+            {
+                selectedObject = interactable.transform.gameObject;
+            }
+        });
+
+        // Ao soltar -> "congelar" novamente e zerar velocidades (evita que caia/escape)
+        grab.selectExited.AddListener((SelectExitEventArgs args) =>
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
+            selectedObject = null;
+        });
+        currentObj = root;
+    }
+
+    // Chame esse método quando o botão deletar for pressionado
+    public void DeleteSelectedObject()
+    {
+        if (selectedObject != null)
+        {
+            Destroy(selectedObject);
+            selectedObject = null;
+            Debug.Log("Objeto destruído.");
+        }
+        else
+        {
+            Debug.Log("Nenhum objeto selecionado para destruir.");
+        }
     }
 
     private void ResetSpawn()
@@ -124,10 +204,9 @@ public class InventoryController : MonoBehaviour
             GameObject model3D = Instantiate(model, ObjectStorage.transform);
             model3D.transform.localPosition = Vector3.zero;
             currentObj = model3D;
-            FindFirstObjectByType<ObjectManipulationController>().SetObject(currentObj);
-            FindFirstObjectByType<ObjectManipulationController>().EnableCanvas();
+            EnableCanvas();
             wasSpawned = true;
-            Invoke("ResetSpawn", 3f);
+            Invoke("ResetSpawn", 4f);
         }
     }
 }
