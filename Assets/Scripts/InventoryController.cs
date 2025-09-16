@@ -14,18 +14,19 @@ using Image = UnityEngine.UI.Image;
 
 public class InventoryController : MonoBehaviour
 {
+    [Header("Inventary")]
     [SerializeField] private Button returnBtn;
-    [SerializeField] private Button deleteObj;
     [SerializeField] private Transform content;
     [SerializeField] private GameObject prefab;
+    [SerializeField] private Slider size;
     [SerializeField] private GameObject ObjectStorage;
-    [SerializeField] private GameObject panel;
-    private GameObject currentObj = null;
     private bool wasSpawned = false;
 
-    // Objeto atualmente segurado
+    [Header("Object Manipulation")]
+    [SerializeField] private Button deleteObj;
+    [SerializeField] private GameObject panel;
+    private GameObject currentObj = null;
     private GameObject selectedObject = null;
-
 
     private Dictionary<Sprite, (GameObject, GameObject)> objects = new Dictionary<Sprite, (GameObject, GameObject)>();
     private int count=0;
@@ -34,6 +35,20 @@ public class InventoryController : MonoBehaviour
     {
         returnBtn.onClick.AddListener(ReturnStep);
         deleteObj.onClick.AddListener(DeleteSelectedObject);
+        size.onValueChanged.AddListener(SetSize);
+    }
+
+    private void SetSize(float value)
+    {
+        if (selectedObject!= null)
+        {
+            selectedObject.transform.localScale = Vector3.one*value;
+            Debug.Log("Tamanho alterado!");
+        }
+        else
+        {
+            Debug.Log("Nenhum objeto selecionado para alterar o tamanho.");
+        }
     }
 
     public GameObject GetStorage()
@@ -62,9 +77,6 @@ public class InventoryController : MonoBehaviour
         byte[] glbBytes = Convert.FromBase64String(glb_base64);
 
         await SpawnGlbBytes(glbBytes);
-
-        // 2. Caminho de sa�da no disco
-        //string path = Path.Combine(Application.persistentDataPath, "modelo.glb");
 
         byte[] imgBytes = Convert.FromBase64String(image_base64);
         string path2 = Path.Combine(Application.persistentDataPath, "modelo" + count +".png");
@@ -120,8 +132,6 @@ public class InventoryController : MonoBehaviour
             Debug.LogError("[GlbSpawnFromBase64] Falha ao instanciar cena principal do GLB.");
             return;
         }
-        root.transform.parent = ObjectStorage.transform;
-        root.transform.localPosition = Vector3.zero;
 
         // --- FIND THE MESH GAMEOBJECT (assume a single mesh)
         var meshFilter = root.GetComponentInChildren<MeshFilter>();
@@ -154,8 +164,11 @@ public class InventoryController : MonoBehaviour
         attach.transform.localPosition = meshFilter.sharedMesh.bounds.center;
         grab.attachTransform = attach.transform;
 
-        // --- OPTIONAL: toggling kinematic for physics-based grab
-        // Quando selecionado -> deixa n�o-kinematic (move por f�sica/velocidade)
+        root.transform.parent = ObjectStorage.transform;
+        root.transform.localPosition = Vector3.zero;
+
+        grab.trackScale = false;
+
         grab.selectEntered.AddListener((SelectEnterEventArgs args) =>
         {
             rb.isKinematic = false;
@@ -174,6 +187,7 @@ public class InventoryController : MonoBehaviour
             rb.isKinematic = true;
             selectedObject = null;
         });
+
         currentObj = root;
     }
 

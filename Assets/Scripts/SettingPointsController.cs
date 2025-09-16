@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GLTFast.Schema;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -19,8 +20,8 @@ public class SettingPointsController : MonoBehaviour
     private Cubemap currentCubemap;
     private Texture2D result;
     private List<Vector2> coords = new List<Vector2>();
+    private float radius = 10f;
 
-    public Texture2D hdrTexture;
     [SerializeField] private TextMeshProUGUI description;
     [SerializeField] private Button sendBtn;
     [SerializeField] private Button backBtn;
@@ -30,17 +31,17 @@ public class SettingPointsController : MonoBehaviour
 
     [SerializeField] private GameObject markerPrefab;
 
+    public UnityEngine.Material lineMaterial;          // material emissivo para a linha
+    //public UnityEngine.Material fillMaterial;          // material transparente para preencher (opcional)
+
+    private LineRenderer lr;
+    private GameObject fillQuad;
+
     private void MarkerInstance(Vector3 dir)
     {
-        float radius = 10f;
-        Vector3 pos = Camera.main.transform.position + dir.normalized * radius;
+        Vector3 pos = UnityEngine.Camera.main.transform.position + dir.normalized * radius;
 
         points.Add(Instantiate(markerPrefab, pos, Quaternion.Euler(0f, 90f, 0f)));
-    }
-
-    public void SethdrTexture(Texture2D tex)
-    {
-        hdrTexture = tex;
     }
 
     public void SetCubemap(Cubemap cub)
@@ -68,6 +69,12 @@ public class SettingPointsController : MonoBehaviour
 
     private void Start()
     {
+        lr = GetComponent<LineRenderer>();
+        lr.loop = true;
+        lr.widthMultiplier = 0.05f;
+        if (lineMaterial != null) lr.material = lineMaterial;
+
+
         description.text = "Press X to set the points...";
         sendBtn.onClick.AddListener(() => {
             GameController.Instance.ChangeState(State.Recording);
@@ -112,14 +119,15 @@ public class SettingPointsController : MonoBehaviour
                 {
                     result = CropBoxFromDirections(currentCubemap, directions[0], directions[1]);
 
-                    string folderPath = Path.Combine(Application.dataPath, "croppeds");
+                    DrawBox(directions[0], directions[1]);
+                    /*string folderPath = Path.Combine(Application.dataPath, "croppeds");
                     Directory.CreateDirectory(folderPath);
 
                     int id = UnityEngine.Random.Range(0, 1000);
 
                     byte[] image = result.EncodeToPNG();
                     string filePath = Path.Combine(folderPath, $"cropped_{id}.png");
-                    File.WriteAllBytes(filePath, image);
+                    File.WriteAllBytes(filePath, image);*/
 
                     description.text = " 2 pontod set!";
                     rayInteractor.gameObject.SetActive(false);
@@ -164,6 +172,75 @@ public class SettingPointsController : MonoBehaviour
             }
 #endif
         }
+    }
+
+    /// <summary>
+    /// Marca um retângulo no skybox a partir de duas direções (normalizadas).
+    /// </summary>
+    public void DrawBox(Vector3 dirA, Vector3 dirB)
+    {
+        // Converte direções para UVs esféricos (como no HDR equiretangular)
+        Vector2 uvA = DirToUV(dirA);
+        Vector2 uvB = DirToUV(dirB);
+
+        // Calcula os outros dois cantos combinando u/v
+        Vector2 uvC = new Vector2(uvA.x, uvB.y);
+        Vector2 uvD = new Vector2(uvB.x, uvA.y);
+
+        // Converte de volta para direções 3D
+        Vector3 cornerA = UVToDir(uvA) * radius + UnityEngine.Camera.main.transform.position;
+        Vector3 cornerB = UVToDir(uvC) * radius + UnityEngine.Camera.main.transform.position;
+        Vector3 cornerC = UVToDir(uvB) * radius + UnityEngine.Camera.main.transform.position;
+        Vector3 cornerD = UVToDir(uvD) * radius + UnityEngine.Camera.main.transform.position;
+
+        // Desenha borda com LineRenderer
+        lr.positionCount = 5;
+        lr.SetPositions(new Vector3[] { cornerA, cornerB, cornerC, cornerD, cornerA });
+
+        // Opcional: criar quad preenchido
+        /*if (fillMaterial != null)
+        {
+            if (fillQuad == null)
+            {
+                fillQuad = new GameObject("BoxFill");
+                var mf = fillQuad.AddComponent<MeshFilter>();
+                var mr = fillQuad.AddComponent<MeshRenderer>();
+                mr.material = fillMaterial;
+            }
+
+            UnityEngine.Mesh mesh = new UnityEngine.Mesh();
+            mesh.vertices = new Vector3[] { cornerA, cornerB, cornerC, cornerD };
+            mesh.triangles = new int[] { 0, 1, 2, 0, 2, 3 };
+            mesh.RecalculateNormals();
+
+            fillQuad.GetComponent<MeshFilter>().mesh = mesh;
+        }*/
+    }
+
+    // Converte direção no mundo -> UV equiretangular
+    private Vector2 DirToUV(Vector3 dir)
+    {
+        dir.Normalize();
+        dir = new Vector3(-dir.x, dir.y, -dir.z); // alinhamento HDR
+
+        float u = 0.5f + (Mathf.Atan2(dir.z, dir.x) / (2 * Mathf.PI));
+        float v = 0.5f - (Mathf.Asin(dir.y) / Mathf.PI);
+
+        return new Vector2(u, v);
+    }
+
+    // Converte UV equiretangular -> direção no mundo
+    private Vector3 UVToDir(Vector2 uv)
+    {
+        float lon = (uv.x - 0.5f) * 2f * Mathf.PI;
+        float lat = (0.5f - uv.y) * Mathf.PI;
+
+        float x = Mathf.Cos(lat) * Mathf.Cos(lon);
+        float y = Mathf.Sin(lat);
+        float z = Mathf.Cos(lat) * Mathf.Sin(lon);
+
+        Vector3 dir = new Vector3(-x, y, -z); // reverter alinhamento
+        return dir.normalized;
     }
 
     Texture2D MakeReadable(Texture2D source)
@@ -249,16 +326,6 @@ public class SettingPointsController : MonoBehaviour
             result.Apply();
             return result;
         }
-    }
-
-    [Serializable]
-    public class WorldTexture {
-        public Texture2D up;
-        public Texture2D down;
-        public Texture2D front;
-        public Texture2D back;
-        public Texture2D left;
-        public Texture2D right;
     }
 
     #region 6 faces
