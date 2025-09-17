@@ -60,7 +60,6 @@ public class ChooseImageController : MonoBehaviour
         card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.world[currentIndex].image;
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
         card.transform.GetChild(1).GetChild(1).GetChild(0).gameObject.SetActive(false);
-        card.transform.GetChild(1).GetChild(2).GetChild(0).gameObject.SetActive(false);
     }
 
     private void PreviousCategory()
@@ -76,7 +75,6 @@ public class ChooseImageController : MonoBehaviour
         card.transform.GetChild(0).GetChild(0).GetComponent<Image>().sprite = currentCategory.world[currentIndex].image;
         card.transform.GetChild(1).GetChild(currentIndex).GetChild(0).gameObject.SetActive(true);
         card.transform.GetChild(1).GetChild(1).GetChild(0).gameObject.SetActive(false);
-        card.transform.GetChild(1).GetChild(2).GetChild(0).gameObject.SetActive(false);
     }
 
     private void NextCard()

@@ -27,6 +27,7 @@ public class SettingPointsController : MonoBehaviour
     [SerializeField] private Button backBtn;
     private Vector3[] directions = new Vector3[2];
     private List<GameObject> points = new List<GameObject>();
+    private List<InputDevice> devices = new List<InputDevice>();
     private int pointIndex = 0;
 
     [SerializeField] private GameObject markerPrefab;
@@ -39,7 +40,7 @@ public class SettingPointsController : MonoBehaviour
 
     private void MarkerInstance(Vector3 dir)
     {
-        Vector3 pos = UnityEngine.Camera.main.transform.position + dir.normalized * radius;
+        Vector3 pos = dir.normalized * radius + UnityEngine.Camera.main.transform.position;
 
         points.Add(Instantiate(markerPrefab, pos, Quaternion.Euler(0f, 90f, 0f)));
     }
@@ -141,11 +142,12 @@ public class SettingPointsController : MonoBehaviour
 
             if(isPressed)
             {
-                rayInteractor.gameObject.SetActive(true);
                 description.text = $"Setting the point {pointIndex + 1}...";
                 Debug.Log($"Setting the point {pointIndex + 1}...");
                 // Pega a direção do raio
                 Vector3 dir = rayInteractor.rayOriginTransform.forward.normalized;
+
+                MarkerInstance(dir);
 
                 directions[pointIndex] = dir;
 
@@ -156,14 +158,15 @@ public class SettingPointsController : MonoBehaviour
                 {
                     result = CropBoxFromDirections(currentCubemap, directions[0], directions[1]);
 
-                    string folderPath = Path.Combine(Application.dataPath, "croppeds");
+                    DrawBox(directions[0], directions[1]);
+                    /*string folderPath = Path.Combine(Application.dataPath, "croppeds");
                     Directory.CreateDirectory(folderPath);
 
                     int id = UnityEngine.Random.Range(0, 1000);
 
                     byte[] image = result.EncodeToPNG();
                     string filePath = Path.Combine(folderPath, $"cropped_{id}.png");
-                    File.WriteAllBytes(filePath, image);
+                    File.WriteAllBytes(filePath, image);*/
 
                     description.text = " 2 pontod set!";
                     rayInteractor.gameObject.SetActive(false);
@@ -191,7 +194,7 @@ public class SettingPointsController : MonoBehaviour
         Vector3 cornerA = UVToDir(uvA) * radius + UnityEngine.Camera.main.transform.position;
         Vector3 cornerB = UVToDir(uvC) * radius + UnityEngine.Camera.main.transform.position;
         Vector3 cornerC = UVToDir(uvB) * radius + UnityEngine.Camera.main.transform.position;
-        Vector3 cornerD = UVToDir(uvD) * radius + UnityEngine.Camera.main.transform.position;
+        Vector3 cornerD = UVToDir(uvD) * radius + UnityEngine.Camera.main.transform.position;    
 
         // Desenha borda com LineRenderer
         lr.positionCount = 5;
